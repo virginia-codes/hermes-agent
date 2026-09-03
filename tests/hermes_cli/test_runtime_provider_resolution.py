@@ -13,20 +13,20 @@ def test_configured_api_key_provider_without_key_fails_closed(monkeypatch):
     monkeypatch.setattr(
         rp,
         "_get_model_config",
-        lambda: {"provider": "deepseek", "default": "deepseek-v4-pro"},
+        lambda: {"provider": "xai", "default": "grok-4-fast-reasoning"},
     )
     monkeypatch.setattr(rp, "load_pool", lambda _provider: SimpleNamespace(has_credentials=lambda: False))
     monkeypatch.setattr(
         "hermes_cli.auth.resolve_api_key_provider_credentials",
         lambda _provider: {
-            "provider": "deepseek",
+            "provider": "xai",
             "api_key": "",
-            "base_url": "https://api.deepseek.com/v1",
+            "base_url": "https://api.x.ai/v1",
             "source": "default",
         },
     )
 
-    with pytest.raises(rp.AuthError, match="No usable credentials.*deepseek"):
+    with pytest.raises(rp.AuthError, match="No usable credentials.*xai"):
         rp.resolve_runtime_provider()
 
 
@@ -153,25 +153,6 @@ class TestCustomProviderPoolLoopbackNoKeyExemption:
         result = rp._try_resolve_from_custom_pool("http://localhost:11434/v1", "custom", None)
 
         assert result["api_key"] == "sk-genuinely-long-real-key-12345"
-
-
-def test_qwen_oauth_auto_fallthrough_on_auth_failure(monkeypatch):
-    """When requested_provider is 'auto' and Qwen creds fail, fall through."""
-    from hermes_cli.auth import AuthError
-
-    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "qwen-oauth")
-    monkeypatch.setattr(
-        rp,
-        "resolve_qwen_runtime_credentials",
-        lambda **kw: (_ for _ in ()).throw(AuthError("stale", provider="qwen-oauth", code="qwen_auth_missing")),
-    )
-    monkeypatch.setattr(rp, "_get_model_config", lambda: {})
-    monkeypatch.setenv("OPENROUTER_API_KEY", "test-or-key")
-
-    # Should NOT raise — falls through to OpenRouter
-    resolved = rp.resolve_runtime_provider(requested="auto")
-    # The fallthrough means it won't be qwen-oauth
-    assert resolved["provider"] != "qwen-oauth"
 
 
 def test_resolve_runtime_provider_ai_gateway(monkeypatch):
@@ -877,23 +858,6 @@ def test_explicit_openrouter_skips_openai_base_url(monkeypatch):
 
 
 
-def test_minimax_config_base_url_overrides_hardcoded_default(monkeypatch):
-    """model.base_url in config.yaml should override the hardcoded default (#6039)."""
-    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "minimax")
-    monkeypatch.setattr(rp, "_get_model_config", lambda: {
-        "provider": "minimax",
-        "base_url": "https://api.minimaxi.com/anthropic",
-    })
-    monkeypatch.setenv("MINIMAX_API_KEY", "test-minimax-key")
-    monkeypatch.delenv("MINIMAX_BASE_URL", raising=False)
-
-    resolved = rp.resolve_runtime_provider(requested="minimax")
-
-    assert resolved["provider"] == "minimax"
-    assert resolved["base_url"] == "https://api.minimaxi.com/anthropic"
-    assert resolved["api_mode"] == "anthropic_messages"
-
-
 def test_opencode_go_model_derivation_beats_stale_persisted_api_mode(monkeypatch):
     """opencode-zen/go re-derive api_mode from the effective model on every
     resolve, ignoring any persisted ``api_mode`` in config. Refs #16878 /
@@ -1253,82 +1217,6 @@ class TestProviderEntryApiKeyEnvAlias:
 # Tencent TokenHub — API-key provider runtime resolution
 # =============================================================================
 
-
-
-# ---------------------------------------------------------------------------
-# minimax-oauth runtime resolution tests (added by feat/minimax-oauth-provider)
-# ---------------------------------------------------------------------------
-
-def test_minimax_oauth_runtime_returns_anthropic_messages_mode(monkeypatch):
-    """resolve_runtime_provider for minimax-oauth must return api_mode='anthropic_messages'."""
-    from hermes_cli.auth import MINIMAX_OAUTH_GLOBAL_INFERENCE
-
-    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "minimax-oauth")
-    monkeypatch.setattr(rp, "_get_model_config", lambda: {"provider": "minimax-oauth"})
-    monkeypatch.setattr(rp, "load_pool", lambda provider: None)
-    monkeypatch.setattr(
-        rp,
-        "_resolve_named_custom_runtime",
-        lambda **k: None,
-    )
-    monkeypatch.setattr(
-        rp,
-        "_resolve_explicit_runtime",
-        lambda **k: None,
-    )
-
-    fake_creds = {
-        "provider": "minimax-oauth",
-        "api_key": "mock-access-token",
-        "base_url": MINIMAX_OAUTH_GLOBAL_INFERENCE.rstrip("/"),
-        "source": "oauth",
-    }
-
-    import hermes_cli.auth as auth_mod
-    monkeypatch.setattr(auth_mod, "resolve_minimax_oauth_runtime_credentials",
-                        lambda **k: fake_creds)
-
-    resolved = rp.resolve_runtime_provider(requested="minimax-oauth")
-
-    assert resolved["provider"] == "minimax-oauth"
-    assert resolved["api_mode"] == "anthropic_messages"
-    assert resolved["api_key"] == "mock-access-token"
-
-
-def test_minimax_oauth_pool_forces_anthropic_messages_despite_stale_config(monkeypatch):
-    """A pooled MiniMax OAuth token must not inherit stale chat_completions config."""
-
-    class _Entry:
-        access_token = "oauth-token"
-        source = "manual:minimax_oauth"
-        base_url = "https://api.minimax.io/anthropic"
-
-    class _Pool:
-        def has_credentials(self):
-            return True
-
-        def select(self):
-            return _Entry()
-
-    monkeypatch.setattr(rp, "resolve_provider", lambda *a, **k: "minimax-oauth")
-    monkeypatch.setattr(
-        rp,
-        "_get_model_config",
-        lambda: {
-            "provider": "minimax-oauth",
-            "default": "MiniMax-M2.7",
-            "api_mode": "chat_completions",
-        },
-    )
-    monkeypatch.setattr(rp, "load_pool", lambda provider: _Pool())
-    monkeypatch.setattr(rp, "_resolve_named_custom_runtime", lambda **k: None)
-    monkeypatch.setattr(rp, "_resolve_explicit_runtime", lambda **k: None)
-
-    resolved = rp.resolve_runtime_provider(requested="minimax-oauth")
-
-    assert resolved["provider"] == "minimax-oauth"
-    assert resolved["api_mode"] == "anthropic_messages"
-    assert resolved["base_url"] == "https://api.minimax.io/anthropic"
 
 
 # ----------------------------------------------------------------------

@@ -1,7 +1,7 @@
 """Regression tests for the OAuth dispatcher in hermes_cli.web_server.
 
 Bug history (2026-05-09): the `_OAUTH_PROVIDER_CATALOG` had two entries
-flagged ``flow: "pkce"`` — anthropic and minimax-oauth — and the
+flagged ``flow: "pkce"`` — anthropic — and the
 dispatcher ``start_oauth_login`` hardcoded ``_start_anthropic_pkce()``
 for any pkce-flagged provider. So clicking "Login" next to MiniMax in
 the dashboard's Keys tab silently launched the Anthropic/Claude OAuth
@@ -10,7 +10,6 @@ Hermes must not mint subscription OAuth tokens from an unattended HTTP
 endpoint; only the approved external CLI path remains.
 
 The fix:
-  1. Catalog entry for minimax-oauth changed from ``flow: "pkce"`` to
      ``flow: "device_code"`` (the actual UX is verification URI + user
      code + background poll, with PKCE as a security extension).
   2. New MiniMax branch added to ``_start_device_code_flow``.
@@ -70,48 +69,6 @@ def _invoke_scope_refusal():
     return httpx.HTTPStatusError("invalid scope", request=request, response=response)
 
 
-def test_minimax_login_does_not_launch_anthropic_flow():
-    """Click 'Login' on MiniMax → MUST NOT return claude.ai auth_url."""
-    fake_user_code_resp = {
-        "user_code": "ABCD-1234",
-        "verification_uri": "https://api.minimax.io/oauth/verify",
-        # `expired_in` < 1e12 so the heuristic treats it as seconds.
-        "expired_in": 600,
-        "interval": 2000,
-        "state": "stub-state",
-    }
-    with patch(
-        "hermes_cli.auth._minimax_request_user_code",
-        return_value=fake_user_code_resp,
-    ), patch(
-        "hermes_cli.auth._minimax_pkce_pair",
-        return_value=("verifier-stub", "challenge-stub", "stub-state"),
-    ), patch(
-        "hermes_cli.web_server._minimax_poller",
-        return_value=None,
-    ):
-        resp = client.post(
-            "/api/providers/oauth/minimax-oauth/start",
-            headers=HEADERS,
-        )
-
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-
-    # The bug used to return Anthropic's auth_url — make sure the response
-    # references neither the auth_url field nor anything Claude-related.
-    assert "auth_url" not in body
-    assert "claude.ai" not in str(body).lower()
-
-    # And the response IS the device-code shape pointing at MiniMax.
-    assert body["flow"] == "device_code"
-    assert "minimax" in body["verification_url"].lower()
-    assert body["user_code"] == "ABCD-1234"
-    assert body["expires_in"] == 600
-
-
-
-
 def test_oauth_provider_status_uses_profile_query(tmp_path, monkeypatch):
     from hermes_cli import web_server as ws
     from hermes_constants import get_hermes_home
@@ -137,40 +94,6 @@ def test_oauth_provider_status_uses_profile_query(tmp_path, monkeypatch):
 
     assert resp.status_code == 200, resp.text
     assert observed_homes == [profile_home]
-
-
-def test_oauth_start_stores_profile_for_background_completion(tmp_path, monkeypatch):
-    from hermes_cli import web_server as ws
-
-    _make_profile_home(tmp_path, monkeypatch)
-    fake_user_code_resp = {
-        "user_code": "ABCD-1234",
-        "verification_uri": "https://api.minimax.io/oauth/verify",
-        "expired_in": 600,
-        "interval": 2000,
-        "state": "stub-state",
-    }
-    with patch(
-        "hermes_cli.auth._minimax_request_user_code",
-        return_value=fake_user_code_resp,
-    ), patch(
-        "hermes_cli.auth._minimax_pkce_pair",
-        return_value=("verifier-stub", "challenge-stub", "stub-state"),
-    ), patch(
-        "hermes_cli.web_server._minimax_poller",
-        return_value=None,
-    ):
-        resp = client.post(
-            "/api/providers/oauth/minimax-oauth/start?profile=coder",
-            headers=HEADERS,
-        )
-
-    assert resp.status_code == 200, resp.text
-    session_id = resp.json()["session_id"]
-    try:
-        assert ws._oauth_sessions[session_id]["profile"] == "coder"
-    finally:
-        ws._oauth_sessions.pop(session_id, None)
 
 
 def test_oauth_session_cannot_be_polled_or_cancelled_from_another_profile(
@@ -597,13 +520,6 @@ def test_oauth_catalog_marks_external_providers_not_disconnectable():
     assert resp.status_code == 200, resp.text
     providers = {p["id"]: p for p in resp.json()["providers"]}
 
-    # Qwen: external and not auto-removable, and we don't know a clear command,
-    # so it stays a manual hint with no runnable disconnect command.
-    assert providers["qwen-oauth"]["flow"] == "external"
-    assert providers["qwen-oauth"]["disconnectable"] is False
-    assert "provider's CLI" in providers["qwen-oauth"]["disconnect_hint"]
-    assert providers["qwen-oauth"]["disconnect_command"] is None
-
     # Claude Code: still not API-disconnectable, but we hand the GUI a runnable
     # command (clears the keychain entry / credentials file) so it can offer a
     # one-click "run in terminal" disconnect.
@@ -623,7 +539,7 @@ def test_external_oauth_disconnect_rejected_before_auth_mutation(monkeypatch):
 
     monkeypatch.setattr(auth_mod, "clear_provider_auth", fail_clear_provider_auth)
 
-    resp = client.delete("/api/providers/oauth/qwen-oauth", headers=HEADERS)
+    resp = client.delete("/api/providers/oauth/copilot-acp", headers=HEADERS)
     assert resp.status_code == 400, resp.text
     assert "cannot be disconnected automatically" in resp.text
     assert "provider's CLI" in resp.text
