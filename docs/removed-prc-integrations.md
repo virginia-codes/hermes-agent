@@ -93,6 +93,14 @@ removed from `gateway/`, `hermes_cli/`, `toolsets.py`, and
   `agent/credential_persistence.py`).
 - All corresponding env vars and commented examples in `.env.example` and
   `cli-config.yaml.example`.
+- `README.zh-CN.md`, the Chinese-language README translation, along with the
+  language badge linking to it from `README.md`, `README.es.md` and
+  `README.ur-pk.md`, and its entry in the `nix/lib.nix` wheel-source exclusion
+  list. This one is a judgment call rather than a service connection: the
+  translation reached no PRC endpoint, so it was initially kept and is now
+  removed on the narrower ground that the project no longer maintains a
+  zh-CN surface. Reinstating it would not reopen any of the network paths this
+  document is about.
 
 ## Enforcement: the endpoint deny-list
 
@@ -159,8 +167,6 @@ isn't redrawn by accident:
   founder nationality rather than operator jurisdiction.
 - **Upstage** (`upstage`) — South Korean.
 - **LINE** (`plugins/platforms/line`) — operated by LY Corporation (Japan).
-- **`README.zh-CN.md`** — a Chinese-language translation of the README. A
-  translation is not a service connection.
 
 ## Known residue
 
