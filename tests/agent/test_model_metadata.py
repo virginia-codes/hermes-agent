@@ -1253,7 +1253,7 @@ class TestStripProviderPrefix:
         assert _strip_provider_prefix("local:my-model") == "my-model"
         assert _strip_provider_prefix("openrouter:anthropic/claude-sonnet-4") == "anthropic/claude-sonnet-4"
         assert _strip_provider_prefix("anthropic:claude-sonnet-4") == "claude-sonnet-4"
-        assert _strip_provider_prefix("stepfun:step-3.5-flash") == "step-3.5-flash"
+        assert _strip_provider_prefix("upstage:solar-pro3") == "solar-pro3"
 
 
     def test_http_urls_preserved(self):

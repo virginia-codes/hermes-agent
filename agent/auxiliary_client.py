@@ -1290,14 +1290,11 @@ def _resolve_provider_vision_default(provider: str) -> Optional[str]:
 # it must skip straight to the aggregator chain instead of returning a client
 # that will 404 on every vision request.
 #
-# kimi-coding / kimi-coding-cn: the Kimi Coding Plan routes through
-# api.kimi.com/coding (Anthropic Messages wire) which Kimi's own docs
-# describe as having no image_in capability. Vision lives on the separate
-# Kimi Platform (api.moonshot.ai, OpenAI-wire, pay-as-you-go).  See #17076.
-_PROVIDERS_WITHOUT_VISION: frozenset = frozenset({
-    "kimi-coding",
-    "kimi-coding-cn",
-})
+# Intentionally empty. Its members were kimi-coding / kimi-coding-cn (the Kimi
+# Coding Plan's /coding endpoint has no image_in capability, #17076); those
+# providers were removed, see docs/removed-prc-integrations.md. The set and its
+# branch below stay so a future no-vision endpoint needs one line here.
+_PROVIDERS_WITHOUT_VISION: frozenset = frozenset()
 
 # OpenRouter app attribution headers (base — always sent).
 # `X-Title` is the canonical attribution header OpenRouter's dashboard
@@ -6793,7 +6790,7 @@ def resolve_provider_client(
     Args:
         provider: Provider identifier.  One of:
             "openrouter", "nous", "openai-codex" (or "codex"),
-            "zai", "kimi-coding", "minimax", "minimax-cn",
+            "anthropic", "gemini", "xai", "upstage",
             "custom" (OPENAI_BASE_URL + OPENAI_API_KEY),
             "auto" (full auto-detection chain).
         model: Model slug override.  If None, uses the provider's default
@@ -6816,8 +6813,8 @@ def resolve_provider_client(
     _validate_proxy_env_urls()
     # Preserve the original provider name before alias normalization so a
     # user-declared ``custom_providers`` entry whose name coincidentally
-    # matches a built-in alias (e.g. user names their custom provider "kimi"
-    # which aliases to "kimi-coding") is still reachable via the named-custom
+    # matches a built-in alias (e.g. user names their custom provider "solar"
+    # which aliases to "upstage") is still reachable via the named-custom
     # branch below.
     original_provider = (provider or "").strip().lower()
     # Normalise aliases

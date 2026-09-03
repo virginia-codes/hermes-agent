@@ -162,22 +162,22 @@ class TestResolveProviderClientModelNormalization:
 
     def test_matching_native_prefix_is_stripped_for_main_provider(self, tmp_path):
         _write_config(tmp_path, {
-            "model": {"default": "zai/glm-5.1", "provider": "zai"},
+            "model": {"default": "xai/grok-4-fast", "provider": "xai"},
         })
         with (
             patch("hermes_cli.auth.resolve_api_key_provider_credentials", return_value={
-                "api_key": "glm-key",
-                "base_url": "https://api.z.ai/api/paas/v4",
+                "api_key": "xai-key",
+                "base_url": "https://api.x.ai/v1",
             }),
             patch("agent.auxiliary_client.OpenAI") as mock_openai,
         ):
             mock_openai.return_value = MagicMock()
             from agent.auxiliary_client import resolve_provider_client
 
-            client, model = resolve_provider_client("main", "zai/glm-5.1")
+            client, model = resolve_provider_client("main", "xai/grok-4-fast")
 
         assert client is not None
-        assert model == "glm-5.1"
+        assert model == "grok-4-fast"
 
 
     def test_aggregator_vendor_slug_is_preserved(self, monkeypatch):
@@ -198,14 +198,25 @@ class TestResolveVisionProviderClientModelNormalization:
     """Vision auto-routing should reuse the same provider-specific normalization."""
 
     def test_vision_auto_strips_matching_main_provider_prefix(self, tmp_path):
+        """A dedicated vision model wins over the prefixed main chat model.
+
+        ``_PROVIDER_VISION_MODELS`` is empty since the PRC providers were
+        removed (its two entries were ``zai`` and ``xiaomi``), so the map is
+        patched with a synthetic entry rather than dropping the coverage.
+        """
         _write_config(tmp_path, {
-            "model": {"default": "zai/glm-5.1", "provider": "zai"},
+            "model": {"default": "xai/grok-4-fast", "provider": "xai"},
         })
         with (
             patch("agent.auxiliary_client._read_nous_auth", return_value=None),
+            patch.dict(
+                "agent.auxiliary_client._PROVIDER_VISION_MODELS",
+                {"xai": "grok-4-vision"},
+                clear=False,
+            ),
             patch("hermes_cli.auth.resolve_api_key_provider_credentials", return_value={
-                "api_key": "glm-key",
-                "base_url": "https://api.z.ai/api/paas/v4",
+                "api_key": "xai-key",
+                "base_url": "https://api.x.ai/v1",
             }),
             patch("agent.auxiliary_client.OpenAI") as mock_openai,
         ):
@@ -214,9 +225,9 @@ class TestResolveVisionProviderClientModelNormalization:
 
             provider, client, model = resolve_vision_provider_client()
 
-        assert provider == "zai"
+        assert provider == "xai"
         assert client is not None
-        assert model == "glm-5v-turbo"  # zai has dedicated vision model in _PROVIDER_VISION_MODELS
+        assert model == "grok-4-vision"
 
 
 class TestVisionPathApiMode:
@@ -231,7 +242,7 @@ class TestVisionPathApiMode:
             mock_gcc.return_value = (MagicMock(), "test-model")
             from agent.auxiliary_client import resolve_vision_provider_client
 
-            provider, client, model = resolve_vision_provider_client(provider="deepseek")
+            provider, client, model = resolve_vision_provider_client(provider="xai")
 
         mock_gcc.assert_called_once()
         _, kwargs = mock_gcc.call_args
@@ -313,44 +324,44 @@ class TestCustomProviderAliasCollision:
     *alias* (not a canonical provider) must win over the built-in.
 
     Regression guard for #15743: users who defined fallback_model pointing at
-    a custom_providers entry named ``kimi`` were having requests routed to
-    the built-in kimi-coding endpoint because ``_normalize_aux_provider``
-    rewrote ``kimi`` → ``kimi-coding`` before the named-custom lookup.
+    a custom_providers entry whose name collides with a built-in provider's
+    alias were having requests routed to the built-in endpoint, because
+    ``_normalize_aux_provider`` canonicalized the alias (here ``solar`` →
+    ``upstage``) before the named-custom lookup ran.
     """
 
-    def test_custom_named_kimi_wins_over_builtin_alias(self, tmp_path):
+    def test_custom_named_solar_wins_over_builtin_alias(self, tmp_path):
         _write_config(tmp_path, {
             "model": {"provider": "openrouter", "default": "anthropic/claude-sonnet-4.6"},
             "custom_providers": [
                 {
-                    "name": "kimi",
-                    "base_url": "https://my-custom-kimi.example.com/v1",
-                    "api_key": "my-kimi-key",
-                    "models": {"my-kimi-model": {"context_length": 200000}},
+                    "name": "solar",
+                    "base_url": "https://my-custom-solar.example.com/v1",
+                    "api_key": "my-solar-key",
+                    "models": {"my-solar-model": {"context_length": 200000}},
                 },
             ],
         })
         from agent.auxiliary_client import resolve_provider_client
         from openai import OpenAI
-        client, model = resolve_provider_client("kimi", model="my-kimi-model", raw_codex=True)
+        client, model = resolve_provider_client("solar", model="my-solar-model", raw_codex=True)
         assert isinstance(client, OpenAI)
-        assert "my-custom-kimi.example.com" in str(client.base_url)
-        assert client.api_key == "my-kimi-key"
-        assert model == "my-kimi-model"
+        assert "my-custom-solar.example.com" in str(client.base_url)
+        assert client.api_key == "my-solar-key"
+        assert model == "my-solar-model"
 
-    def test_bare_kimi_without_custom_still_routes_to_builtin(self, tmp_path, monkeypatch):
-        """Regression guard: bare 'kimi' with no custom entry must still
-        reach the built-in kimi-coding provider."""
+    def test_bare_alias_without_custom_still_routes_to_builtin(self, tmp_path, monkeypatch):
+        """Regression guard: a bare alias with no custom entry must still
+        reach the built-in provider it names."""
         _write_config(tmp_path, {
             "model": {"provider": "openrouter", "default": "anthropic/claude-sonnet-4.6"},
         })
-        monkeypatch.setenv("KIMI_API_KEY", "builtin-kimi-key")
+        monkeypatch.setenv("UPSTAGE_API_KEY", "builtin-solar-key")
         from agent.auxiliary_client import resolve_provider_client
-        client, _ = resolve_provider_client("kimi", model="kimi-k2-0905-preview", raw_codex=True)
+        client, _ = resolve_provider_client("solar", model="solar-pro3", raw_codex=True)
         assert client is not None
         base_url = str(client.base_url)
-        # Built-in kimi-coding points at api.moonshot.ai
-        assert "moonshot" in base_url or "kimi" in base_url, f"unexpected base_url {base_url!r}"
+        assert "upstage" in base_url, f"unexpected base_url {base_url!r}"
 
     def test_explicit_overrides_applied_on_api_key_branch(self, tmp_path, monkeypatch):
         """Explicit base_url/api_key from the caller must override the
@@ -360,11 +371,11 @@ class TestCustomProviderAliasCollision:
         _write_config(tmp_path, {
             "model": {"provider": "openrouter", "default": "anthropic/claude-sonnet-4.6"},
         })
-        monkeypatch.setenv("KIMI_API_KEY", "builtin-kimi-key")
+        monkeypatch.setenv("UPSTAGE_API_KEY", "builtin-solar-key")
         from agent.auxiliary_client import resolve_provider_client
         from openai import OpenAI
         client, _ = resolve_provider_client(
-            "kimi-coding", model="kimi-k2", raw_codex=True,
+            "upstage", model="solar-pro3", raw_codex=True,
             explicit_base_url="https://override.example.com",
             explicit_api_key="override-key",
         )

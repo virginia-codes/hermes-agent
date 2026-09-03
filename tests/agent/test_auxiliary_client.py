@@ -111,10 +111,8 @@ class TestResolveTaskProviderModel:
         "provider",
         [
             "anthropic",
-            "minimax-oauth",
             "nous",
             "openai-codex",
-            "qwen-oauth",
             "xai-oauth",
         ],
     )
@@ -2935,16 +2933,21 @@ class TestAnthropicAuxiliaryReasoningTranslation:
 class TestAuxiliaryProviderProfileReasoning:
     """Auxiliary calls must reuse provider-profile reasoning wire shapes."""
 
-    def test_kimi_reasoning_uses_top_level_effort(self):
+    def test_top_level_effort_profile_is_honored(self):
+        """Upstage Solar exposes reasoning as a top-level ``reasoning_effort``.
+
+        Was written against Kimi, which used the same wire shape; Kimi is gone
+        (docs/removed-prc-integrations.md), so this pins the behaviour on a
+        surviving provider with that shape rather than losing the coverage.
+        """
         kwargs = _build_call_kwargs(
-            "kimi-coding",
-            "kimi-k2-turbo-preview",
+            "upstage",
+            "solar-pro3",
             [{"role": "user", "content": "hi"}],
-            reasoning_config={"enabled": True, "effort": "medium"},
-            base_url="https://api.moonshot.ai/v1",
+            reasoning_config={"enabled": True, "effort": "high"},
+            base_url="https://api.upstage.ai/v1",
         )
 
-        # K3 maps medium → high (ref: K3 model docs)
         assert kwargs["reasoning_effort"] == "high"
         assert "reasoning" not in kwargs.get("extra_body", {})
         assert "thinking" not in kwargs.get("extra_body", {})
@@ -2958,7 +2961,7 @@ class TestAuxiliaryProviderProfileReasoning:
         )
         create = AsyncMock(return_value=response)
         client = SimpleNamespace(
-            base_url="https://api.moonshot.ai/v1",
+            base_url="https://api.upstage.ai/v1",
             chat=SimpleNamespace(
                 completions=SimpleNamespace(create=create),
             ),
@@ -2967,19 +2970,19 @@ class TestAuxiliaryProviderProfileReasoning:
         with patch(
             "agent.auxiliary_client._resolve_task_provider_model",
             return_value=(
-                "kimi-coding",
-                "kimi-k2-turbo-preview",
-                "https://api.moonshot.ai/v1",
+                "upstage",
+                "solar-pro3",
+                "https://api.upstage.ai/v1",
                 "test-key",
                 None,
             ),
         ), patch(
             "agent.auxiliary_client._get_cached_client",
-            return_value=(client, "kimi-k2-turbo-preview"),
+            return_value=(client, "solar-pro3"),
         ):
             result = await async_call_llm(
-                provider="kimi-coding",
-                model="kimi-k2-turbo-preview",
+                provider="upstage",
+                model="solar-pro3",
                 messages=[{"role": "user", "content": "hi"}],
                 reasoning_config={"enabled": True, "effort": "high"},
             )
@@ -3317,29 +3320,36 @@ class TestCodexAdapterGithubResponsesMessageIdDrop:
         assert message_item["id"] == "msg_short_but_connection_scoped"
 
 
-class TestVisionAutoSkipsKimiCoding:
+class TestVisionAutoSkipsProvidersWithoutVision:
     """_resolve_auto vision branch skips providers that have no vision on
-    their main endpoint (e.g. Kimi Coding Plan /coding) and falls through
-    to the aggregator chain instead of handing back a client that will 404
-    on every request (#17076).
+    their main endpoint and falls through to the aggregator chain instead of
+    handing back a client that will 404 on every request (#17076).
+
+    The original members of ``_PROVIDERS_WITHOUT_VISION`` were kimi-coding /
+    kimi-coding-cn; those providers were removed, so the set is empty and the
+    branch is exercised with a synthetic member instead.
     """
 
-    def test_kimi_coding_skipped_falls_through_to_openrouter(self, monkeypatch):
-        """kimi-coding as main + vision auto → OpenRouter (not kimi)."""
+    def test_no_vision_provider_skipped_falls_through_to_openrouter(self, monkeypatch):
+        """A no-vision main provider + vision auto → OpenRouter, not itself."""
         fake_or_client = MagicMock(name="openrouter_client")
 
         monkeypatch.setattr(
-            "agent.auxiliary_client._read_main_provider", lambda: "kimi-coding",
+            "agent.auxiliary_client._PROVIDERS_WITHOUT_VISION",
+            frozenset({"novision-provider"}),
         )
         monkeypatch.setattr(
-            "agent.auxiliary_client._read_main_model", lambda: "kimi-code",
+            "agent.auxiliary_client._read_main_provider", lambda: "novision-provider",
+        )
+        monkeypatch.setattr(
+            "agent.auxiliary_client._read_main_model", lambda: "novision-model",
         )
         # Guard: if the skip doesn't fire, _resolve_strict_vision_backend
-        # and resolve_provider_client both would try kimi-coding — detect
-        # either via the main-provider call and fail loud.
+        # and resolve_provider_client both would try the main provider —
+        # detect either and fail loud.
         rpc_mock = MagicMock(side_effect=AssertionError(
-            "resolve_provider_client should NOT be called for kimi-coding "
-            "on the vision auto path"))
+            "resolve_provider_client should NOT be called for a provider in "
+            "_PROVIDERS_WITHOUT_VISION on the vision auto path"))
         monkeypatch.setattr(
             "agent.auxiliary_client.resolve_provider_client", rpc_mock,
         )
@@ -3351,7 +3361,7 @@ class TestVisionAutoSkipsKimiCoding:
                 return None, None
             raise AssertionError(
                 f"strict vision backend should not be called for {provider!r} "
-                "when main provider is kimi-coding"
+                "when the main provider has no vision endpoint"
             )
         monkeypatch.setattr(
             "agent.auxiliary_client._resolve_strict_vision_backend",
@@ -3363,15 +3373,15 @@ class TestVisionAutoSkipsKimiCoding:
         assert client is fake_or_client
         assert model == "google/gemini-3-flash-preview"
 
+    def test_skip_set_is_empty(self):
+        """Guard against accidental widening of the skip list.
 
-
-    def test_skip_set_covers_exactly_known_entries(self):
-        """Guard against accidental widening of the skip list."""
+        Empty since the Kimi providers were removed; a new entry here silently
+        diverts that provider's vision traffic to the aggregator chain, so it
+        should be a deliberate edit that updates this test too.
+        """
         from agent.auxiliary_client import _PROVIDERS_WITHOUT_VISION
-        assert _PROVIDERS_WITHOUT_VISION == frozenset({
-            "kimi-coding",
-            "kimi-coding-cn",
-        })
+        assert _PROVIDERS_WITHOUT_VISION == frozenset()
 
 
 class TestCodexAuxiliaryAdapterTimeout:

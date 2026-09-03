@@ -211,25 +211,25 @@ def test_runtime_ignores_pool_loaded_for_different_provider(monkeypatch):
         select=lambda: entry,
     )
     monkeypatch.setattr(rp, "load_pool", lambda _provider: pool)
-    monkeypatch.setattr(rp, "resolve_provider", lambda *_a, **_kw: "deepseek")
+    monkeypatch.setattr(rp, "resolve_provider", lambda *_a, **_kw: "nvidia")
     monkeypatch.setattr(
         rp,
         "_get_model_config",
-        lambda: {"provider": "deepseek", "default": "deepseek-chat"},
+        lambda: {"provider": "nvidia", "default": "nvidia-chat"},
     )
     monkeypatch.setattr(
         rp,
         "resolve_api_key_provider_credentials",
         lambda _provider: {
-            "provider": "deepseek",
-            "api_key": "deepseek-key",
-            "base_url": "https://api.deepseek.com/v1",
+            "provider": "nvidia",
+            "api_key": "nvidia-key",
+            "base_url": "https://integrate.api.nvidia.com/v1",
             "source": "env",
         },
     )
 
-    resolved = rp.resolve_runtime_provider(requested="deepseek")
+    resolved = rp.resolve_runtime_provider(requested="nvidia")
 
-    assert resolved["provider"] == "deepseek"
-    assert resolved["api_key"] == "deepseek-key"
-    assert resolved["base_url"] == "https://api.deepseek.com/v1"
+    assert resolved["provider"] == "nvidia"
+    assert resolved["api_key"] == "nvidia-key"
+    assert resolved["base_url"] == "https://integrate.api.nvidia.com/v1"
