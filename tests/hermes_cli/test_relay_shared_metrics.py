@@ -660,7 +660,7 @@ def test_package_schema_matches_the_skill_contract():
         ("kanban", "planning"),
         ("project", "project"),
         ("discord", "communication"),
-        ("feishu_doc", "communication"),
+        ("discord", "communication"),
         ("mcp-github", "mcp"),
         ("private_plugin", "other"),
     ],
@@ -759,10 +759,10 @@ def test_model_call_fields_report_terminal_model_and_provider_without_a_catalog(
         "provider": "openrouter",
     }
     assert model_call_fields({
-        "model": "ZAI/GLM-5.2",
+        "model": "OpenAI/GPT-5.2",
         "provider": "Brev",
     }) == {
-        "model": "zai/glm-5.2",
+        "model": "openai/gpt-5.2",
         "provider": "brev",
     }
 

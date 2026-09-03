@@ -304,21 +304,21 @@ def test_list_authenticated_providers_no_duplicate_labels_across_schemas(monkeyp
 
 
 def test_list_authenticated_providers_dedup_honors_base_url_env_override(monkeypatch):
-    """The dedup must track the EFFECTIVE endpoint — if DASHSCOPE_BASE_URL
+    """The dedup must track the EFFECTIVE endpoint — if NVIDIA_BASE_URL
     overrides the static inference_base_url, a custom provider pointing at
     the overridden URL (not the static one) should still be recognized as
     a duplicate."""
-    monkeypatch.setenv("DASHSCOPE_API_KEY", "sk-test")
+    monkeypatch.setenv("NVIDIA_API_KEY", "sk-test")
     monkeypatch.setenv(
-        "DASHSCOPE_BASE_URL",
-        "https://custom-dashscope.example.com/v1",
+        "NVIDIA_BASE_URL",
+        "https://custom-nvidia.example.com/v1",
     )
     monkeypatch.setattr(
         "agent.models_dev.fetch_models_dev",
         lambda: {
-            "alibaba": {
-                "name": "Alibaba Cloud (DashScope)",
-                "env": ["DASHSCOPE_API_KEY"],
+            "nvidia": {
+                "name": "NVIDIA NIM",
+                "env": ["NVIDIA_API_KEY"],
             }
         },
     )
@@ -326,23 +326,23 @@ def test_list_authenticated_providers_dedup_honors_base_url_env_override(monkeyp
 
     custom_providers = [
         {
-            "name": "my-dashscope-override",
-            # Same URL as DASHSCOPE_BASE_URL env override above.
-            "base_url": "https://custom-dashscope.example.com/v1",
+            "name": "my-nvidia-override",
+            # Same URL as NVIDIA_BASE_URL env override above.
+            "base_url": "https://custom-nvidia.example.com/v1",
             "api_key": "sk-test",
-            "model": "qwen3.6-plus",
+            "model": "nemotron-3-nano",
         }
     ]
 
     providers = list_authenticated_providers(
-        current_provider="alibaba",
+        current_provider="nvidia",
         user_providers={},
         custom_providers=custom_providers,
         max_models=50,
     )
 
     slugs = [p["slug"] for p in providers]
-    assert not any("my-dashscope-override" in s for s in slugs), (
+    assert not any("my-nvidia-override" in s for s in slugs), (
         f"Custom entry matching env-overridden built-in endpoint should be "
         f"dedup'd, got: {slugs}"
     )

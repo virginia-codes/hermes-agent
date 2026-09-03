@@ -40,14 +40,14 @@ def test_auto_resolution_sees_profile_scoped_key(tmp_path):
     """
     from hermes_cli.auth import resolve_provider
 
-    home = _install_profile(tmp_path, "auto", "DEEPSEEK_API_KEY=sk-scoped\n")
+    home = _install_profile(tmp_path, "auto", "NVIDIA_API_KEY=nvapi-scoped\n")
 
     ss.set_multiplex_active(True)
     home_token = set_hermes_home_override(str(home))
     try:
         scope_token = ss.set_secret_scope(ss.build_profile_secret_scope(home))
         try:
-            assert resolve_provider("auto") == "deepseek"
+            assert resolve_provider("auto") == "nvidia"
         finally:
             ss.reset_secret_scope(scope_token)
     finally:

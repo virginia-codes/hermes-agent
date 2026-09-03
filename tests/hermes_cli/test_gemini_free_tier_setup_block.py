@@ -96,7 +96,7 @@ class TestGeminiSetupFreeTierBlock:
 
     def test_non_gemini_provider_skips_probe(self, config_home, monkeypatch):
         """Probe must only run for provider_id == 'gemini', not for other providers."""
-        monkeypatch.setenv("DEEPSEEK_API_KEY", "fake-key")
+        monkeypatch.setenv("NVIDIA_API_KEY", "fake-key")
 
         from hermes_cli.main import _model_flow_api_key_provider
         from hermes_cli.config import load_config
@@ -105,10 +105,10 @@ class TestGeminiSetupFreeTierBlock:
             "agent.gemini_native_adapter.probe_gemini_tier",
         ) as mock_probe, patch(
             "hermes_cli.auth._prompt_model_selection",
-            return_value="deepseek-chat",
+            return_value="nemotron-3-nano",
         ), patch(
             "hermes_cli.auth.deactivate_provider",
         ), patch("builtins.input", return_value=""):
-            _model_flow_api_key_provider(load_config(), "deepseek", "old-model")
+            _model_flow_api_key_provider(load_config(), "nvidia", "old-model")
 
         mock_probe.assert_not_called()

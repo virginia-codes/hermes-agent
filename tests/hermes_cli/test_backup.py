@@ -1429,11 +1429,6 @@ class TestQuickSnapshot:
         (hermes_home / "pairing" / "matrix-approved.json").write_text(
             '{"@charlie:server": {"user_name": "charlie"}}'
         )
-        # Feishu's separate JSON
-        (hermes_home / "feishu_comment_pairing.json").write_text(
-            '{"doc_abc": {"allow_from": ["user_xyz"]}}'
-        )
-
         snap_id = create_quick_snapshot(hermes_home=hermes_home)
         assert snap_id is not None
 
@@ -1441,7 +1436,6 @@ class TestQuickSnapshot:
         assert (snap_dir / "platforms" / "pairing" / "telegram-approved.json").exists()
         assert (snap_dir / "platforms" / "pairing" / "discord-approved.json").exists()
         assert (snap_dir / "pairing" / "matrix-approved.json").exists()
-        assert (snap_dir / "feishu_comment_pairing.json").exists()
 
         with open(snap_dir / "manifest.json") as f:
             meta = json.load(f)
@@ -1449,7 +1443,6 @@ class TestQuickSnapshot:
         assert "platforms/pairing/telegram-approved.json" in files
         assert "platforms/pairing/discord-approved.json" in files
         assert "pairing/matrix-approved.json" in files
-        assert "feishu_comment_pairing.json" in files
 
 
 
@@ -1937,7 +1930,7 @@ class TestRestoreConfigModelSettingsIfRewritten:
         assert snap_id
 
         # The update flow rewrites config.yaml with defaults: provider flips
-        # to deepseek, MoA section is gone (the #64160 field report).
+        # to another provider, MoA section is gone (the #64160 field report).
         cfg.write_text(
             "_config_version: 39\nmodel:\n  provider: deepseek\n  default: deepseek-chat\n",
             encoding="utf-8",
