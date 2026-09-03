@@ -256,18 +256,13 @@ Most platforms also accept an optional thread/topic as a third segment: `platfor
 | Discord | `discord`, `discord:#channel`, `discord:<channel_id>`, `discord:<channel_id>:<thread_id>` | `discord:#engineering` |
 | Slack | `slack`, `slack:#channel`, `slack:<channel_id>`, `slack:<channel_id>:<thread_ts>` | `slack:#engineering` |
 | Matrix | `matrix`, `matrix:<!room_id:server>`, `matrix:<@user:server>` | `matrix:!abc123:example.org` |
-| Feishu | `feishu`, `feishu:<chat_id>`, `feishu:<chat_id>:<thread_id>` | `feishu:oc_abc123def` |
 | WhatsApp | `whatsapp`, `whatsapp:<jid>`, `whatsapp:+<E.164>` | `whatsapp:123456@g.us` |
 | Signal | `signal`, `signal:group:<id>`, `signal:+<E.164>` | `signal:group:aBcD==` |
 | SMS | `sms`, `sms:+<E.164>` | `sms:+<E.164 number>` |
 | Email | `email`, `email:<address>` | `email:alerts@example.com` |
-| Weixin | `weixin`, `weixin:<wxid>` | `weixin:wxid_abc123` |
 | Mattermost | `mattermost` or `mattermost:<channel_id>` | Bare name delivers to Mattermost home |
 | Home Assistant | `homeassistant` or `homeassistant:<conversation>` | Bare name delivers to HA conversation |
-| DingTalk | `dingtalk` or `dingtalk:<chat_id>` | Bare name delivers to DingTalk |
-| WeCom | `wecom` or `wecom:<chat_id>` | Bare name delivers to WeCom |
 | BlueBubbles | `bluebubbles` or `bluebubbles:<chat_guid>` | Bare name delivers to iMessage via BlueBubbles |
-| QQ Bot | `qqbot` or `qqbot:<chat_id>` | Bare name delivers to QQ (Tencent) via Official API v2 |
 | Bot Chat | `bot-chat` or `bot-chat:<profile>` | Inject into a local profile's canonical Bot Chat (the bot responds) |
 
 Platforms in the first group have explicit, validated target syntax — named channels (`#channel`), topics/threads, room/user IDs, group IDs, or phone numbers. The remaining platforms accept the generic `platform:<chat_id>` form (the value after the colon is used verbatim as the destination ID); a bare platform name always delivers to the home channel.

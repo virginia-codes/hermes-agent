@@ -283,8 +283,8 @@ hermes-agent/
 ├── gateway/              # Messaging gateway — run.py + session.py + platforms/
 │   ├── platforms/        # Adapter per platform (telegram, discord, slack, whatsapp,
 │   │                     #   homeassistant, signal, matrix, mattermost, email, sms,
-│   │                     #   dingtalk, wecom, weixin, feishu, qqbot, bluebubbles,
-│   │                     #   yuanbao, webhook, api_server, ...). See ADDING_A_PLATFORM.md.
+│   │                     #   bluebubbles, webhook, api_server, ...).
+│   │                     #   See ADDING_A_PLATFORM.md.
 │   └── builtin_hooks/    # Extension point for always-registered gateway hooks (none shipped)
 ├── plugins/              # Plugin system (see "Plugins" section below)
 │   ├── memory/           # Memory-provider plugins (honcho, mem0, supermemory, ...)
@@ -826,7 +826,7 @@ source-reading tests, or assertions that a global version literal changed.
 
 Separate discovery system for pluggable memory backends. Current built-in
 providers include **honcho, mem0, supermemory, byterover, hindsight,
-holographic, openviking, retaindb**.
+holographic, retaindb**.
 
 Discovery covers the same four sources as the general `PluginManager` —
 bundled, `$HERMES_HOME/plugins/`, `./.hermes/plugins/` (opt-in via
@@ -886,7 +886,7 @@ third-party-product plugins alongside them.)
 
 ### Model-provider plugins (`plugins/model-providers/<name>/`)
 
-Every inference backend (openrouter, anthropic, gmi, deepseek, nvidia, …)
+Every inference backend (openrouter, anthropic, gmi, nvidia, …)
 ships as a plugin here. Each plugin's `__init__.py` calls
 `providers.register_provider(ProviderProfile(...))` at module load.
 `providers/__init__.py._discover_providers()` is a **lazy, separate
@@ -1107,10 +1107,10 @@ Each platform's adapter picks a base toolset (e.g. Telegram uses
 platforms inherit from.
 
 Current toolset keys: `browser`, `clarify`, `code_execution`, `cronjob`,
-`debugging`, `delegation`, `discord`, `discord_admin`, `feishu_doc`,
-`feishu_drive`, `file`, `homeassistant`, `image_gen`, `kanban`, `memory`,
+`debugging`, `delegation`, `discord`, `discord_admin`,
+`file`, `homeassistant`, `image_gen`, `kanban`, `memory`,
 `messaging`, `moa`, `rl`, `safe`, `search`, `session_search`, `skills`,
-`spotify`, `terminal`, `todo`, `tts`, `video`, `vision`, `web`, `yuanbao`.
+`spotify`, `terminal`, `todo`, `tts`, `video`, `vision`, `web`.
 
 Enable/disable per platform via `hermes tools` (the curses UI) or the
 `tools.<platform>.enabled` / `tools.<platform>.disabled` lists in
@@ -1432,10 +1432,10 @@ automatically scope to the active profile.
    `os.environ` holds the **default profile's** values; a secondary profile's `.env` lives
    only in its secret scope (installed per-turn by `_profile_runtime_scope`). Any
    profile-level env config — credentials (`app_secret`, tokens) AND authorization
-   (`FEISHU_ALLOWED_USERS`, `{PLATFORM}_ALLOW_ALL_USERS`, `GATEWAY_ALLOW_ALL_USERS`,
+   (`{PLATFORM}_ALLOWED_USERS`, `{PLATFORM}_ALLOW_ALL_USERS`, `GATEWAY_ALLOW_ALL_USERS`,
    `group_policy`, `allow_bots`, ...) — must be read scope-aware:
    - Adapters: `_get_scoped_secret()` (canonical fail-closed copy in
-     `plugins/platforms/feishu/adapter.py`, #86905).
+     `plugins/platforms/whatsapp/adapter.py`, #86905).
    - Gateway authz: `_auth_env()` / `_platform_gate_env()` (`gateway/authz_mixin.py`).
    Rules:
    - Scope installed + multiplex active → a scoped miss returns the **default**.
@@ -1692,7 +1692,7 @@ CI and cost engineering time to "fix."
 ```python
 # catalog snapshot — breaks every model release
 assert "gemini-2.5-pro" in _PROVIDER_MODELS["gemini"]
-assert "MiniMax-M2.7" in models
+assert "gpt-5.2" in models
 
 # config version literal — breaks every schema bump
 assert DEFAULT_CONFIG["_config_version"] == 21
@@ -1712,7 +1712,7 @@ assert len(_PROVIDER_MODELS["gemini"]) >= 1
 assert raw["_config_version"] == DEFAULT_CONFIG["_config_version"]
 
 # invariant: no plan-only model leaks into the legacy list
-assert not (set(moonshot_models) & coding_plan_only_models)
+assert not (set(legacy_models) & coding_plan_only_models)
 
 # invariant: every model in the catalog has a context-length entry
 for m in _PROVIDER_MODELS["huggingface"]:

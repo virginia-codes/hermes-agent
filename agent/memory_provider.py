@@ -401,7 +401,7 @@ class MemoryProvider(ABC):
         """Return extra on-disk paths this provider stores OUTSIDE HERMES_HOME.
 
         ``hermes backup`` only walks HERMES_HOME, so any provider state kept
-        under ``~/.honcho``, ``~/.hindsight``, ``~/.openviking``, etc. is lost
+        under ``~/.honcho``, ``~/.hindsight``, etc. is lost
         across a backup/import cycle unless it's declared here.
 
         Return a list of absolute path strings (files or directories). The

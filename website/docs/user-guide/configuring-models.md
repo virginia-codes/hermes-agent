@@ -258,7 +258,7 @@ Three things to check:
 
 1. **Did you start a new session?** Existing chats don't re-read config.
 2. **Is `provider` set to something other than `auto`?** If the field shows `auto`, the task is still using your main model. Click **Change** and pick a real provider.
-3. **Is the provider authenticated?** If you assigned `minimax` to a task but don't have a MiniMax API key, that task falls back to the openrouter default and logs a warning in `agent.log`.
+3. **Is the provider authenticated?** If you assigned `nvidia` to a task but don't have an NVIDIA API key, that task falls back to the openrouter default and logs a warning in `agent.log`.
 
 ### I picked a model but Hermes switched providers on me
 
@@ -317,7 +317,7 @@ model_aliases:
 
 When an alias sets neither, the key is resolved from the alias **host** —
 `OLLAMA_API_KEY` for an `ollama.com` endpoint, `DEEPSEEK_API_KEY` for
-`api.deepseek.com`, and so on. It is never inherited from whichever provider
+`api.x.ai`, and so on. It is never inherited from whichever provider
 happened to be active before the switch, so switching to an alias cannot send
 one provider's secret to another provider's host.
 
@@ -337,7 +337,7 @@ hermes config set model.aliases.grok x-ai/grok-4
 
 Both paths feed the same loader (`hermes_cli/model_switch.py`). Entries declared in `model_aliases:` take precedence over `model.aliases:` entries with the same name.
 
-Then `/model fav` or `/model grok` in chat. User aliases shadow built-in short names (`sonnet`, `kimi`, `opus`, etc.). See [Custom model aliases](/reference/slash-commands#custom-model-aliases) for the full reference.
+Then `/model fav` or `/model grok` in chat. User aliases shadow built-in short names (`sonnet`, `opus`, etc.). See [Custom model aliases](/reference/slash-commands#custom-model-aliases) for the full reference.
 
 ### `hermes model` subcommand
 

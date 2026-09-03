@@ -3411,8 +3411,6 @@ _PORT_BINDING_PLATFORM_PORTS: Dict[str, Tuple[str, int]] = {
     "webhook": ("port", 8644),
     "api_server": ("port", 8642),
     "msgraph_webhook": ("port", 8646),
-    "feishu": ("webhook_port", 8765),
-    "wecom_callback": ("port", 8645),
     "bluebubbles": ("webhook_port", 8645),
     "sms": ("webhook_port", 8080),
     "whatsapp_cloud": ("webhook_port", 8090),
@@ -9203,60 +9201,10 @@ _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
         "env_vars": ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"),
         "required_env": ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"),
     },
-    "dingtalk": {
-        "name": "DingTalk",
-        "description": "Connect Hermes to DingTalk groups (钉钉).",
-        "docs_url": "https://open.dingtalk.com/document/orgapp/the-robot-development-process",
-        "env_vars": ("DINGTALK_CLIENT_ID", "DINGTALK_CLIENT_SECRET"),
-        "required_env": ("DINGTALK_CLIENT_ID", "DINGTALK_CLIENT_SECRET"),
-    },
-    "feishu": {
-        "name": "Feishu / Lark",
-        "description": "Use Hermes inside Feishu / Lark.",
-        "docs_url": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/intro",
-        "env_vars": (
-            "FEISHU_APP_ID",
-            "FEISHU_APP_SECRET",
-            "FEISHU_ENCRYPT_KEY",
-            "FEISHU_VERIFICATION_TOKEN",
-        ),
-        "required_env": ("FEISHU_APP_ID", "FEISHU_APP_SECRET"),
-    },
     "google_chat": {
         "name": "Google Chat",
         "description": "Connect Hermes to Google Chat via Cloud Pub/Sub.",
         "docs_url": "https://hermes-agent.nousresearch.com/docs/user-guide/messaging/google_chat",
-    },
-    "wecom": {
-        "name": "WeCom (group bot)",
-        "description": "Send-only WeCom group bot via webhook.",
-        "docs_url": "https://developer.work.weixin.qq.com/document/path/91770",
-        "env_vars": ("WECOM_BOT_ID", "WECOM_SECRET"),
-        "required_env": ("WECOM_BOT_ID",),
-    },
-    "wecom_callback": {
-        "name": "WeCom (app)",
-        "description": "Two-way WeCom integration via callback app.",
-        "docs_url": "https://developer.work.weixin.qq.com/document/path/90930",
-        "env_vars": (
-            "WECOM_CALLBACK_CORP_ID",
-            "WECOM_CALLBACK_CORP_SECRET",
-            "WECOM_CALLBACK_AGENT_ID",
-            "WECOM_CALLBACK_TOKEN",
-            "WECOM_CALLBACK_ENCODING_AES_KEY",
-        ),
-        "required_env": (
-            "WECOM_CALLBACK_CORP_ID",
-            "WECOM_CALLBACK_CORP_SECRET",
-            "WECOM_CALLBACK_AGENT_ID",
-        ),
-    },
-    "weixin": {
-        "name": "Weixin / WeChat (Personal)",
-        "description": "Connect a personal WeChat account through Tencent's iLink Bot API.",
-        "docs_url": "https://hermes-agent.nousresearch.com/docs/user-guide/messaging/weixin/",
-        "env_vars": ("WEIXIN_ACCOUNT_ID", "WEIXIN_TOKEN", "WEIXIN_BASE_URL"),
-        "required_env": ("WEIXIN_ACCOUNT_ID", "WEIXIN_TOKEN"),
     },
     "bluebubbles": {
         "name": "BlueBubbles (iMessage)",
@@ -9268,13 +9216,6 @@ _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
             "BLUEBUBBLES_ALLOWED_USERS",
         ),
         "required_env": ("BLUEBUBBLES_SERVER_URL", "BLUEBUBBLES_PASSWORD"),
-    },
-    "qqbot": {
-        "name": "QQ Bot",
-        "description": "Connect Hermes to a QQ Bot from the QQ Open Platform.",
-        "docs_url": "https://q.qq.com",
-        "env_vars": ("QQ_APP_ID", "QQ_CLIENT_SECRET", "QQ_ALLOWED_USERS"),
-        "required_env": ("QQ_APP_ID", "QQ_CLIENT_SECRET"),
     },
     # Teams ships as a platform plugin, so its name/env vars come from the
     # plugin registry. Only the docs link needs an override here so the
@@ -9309,12 +9250,6 @@ _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
     "simplex": {
         "description": "Talk to Hermes over SimpleX Chat via a local simplex-chat daemon.",
         "docs_url": "https://hermes-agent.nousresearch.com/docs/user-guide/messaging/simplex",
-    },
-    "yuanbao": {
-        "name": "Yuanbao (元宝)",
-        "description": "Connect Hermes to Tencent Yuanbao.",
-        "docs_url": "",
-        "required_env": (),
     },
     "api_server": {
         "name": "API server",
@@ -9369,14 +9304,7 @@ _PLATFORM_ORDER: tuple[str, ...] = (
     "homeassistant",
     "email",
     "sms",
-    "dingtalk",
-    "feishu",
     "google_chat",
-    "wecom",
-    "wecom_callback",
-    "weixin",
-    "qqbot",
-    "yuanbao",
     "api_server",
     "webhook",
 )
@@ -9451,72 +9379,6 @@ _MESSAGING_ENV_FALLBACKS: dict[str, dict[str, Any]] = {
     "TWILIO_AUTH_TOKEN": {
         "description": "Twilio Auth Token",
         "prompt": "Twilio Auth Token",
-        "password": True,
-    },
-    "WECOM_BOT_ID": {"description": "WeCom group bot ID", "prompt": "WeCom Bot ID"},
-    "WECOM_SECRET": {
-        "description": "WeCom group bot secret",
-        "prompt": "WeCom Secret",
-        "password": True,
-    },
-    "WECOM_CALLBACK_CORP_ID": {
-        "description": "WeCom corp ID",
-        "prompt": "WeCom Corp ID",
-    },
-    "WECOM_CALLBACK_CORP_SECRET": {
-        "description": "WeCom app corp secret",
-        "prompt": "WeCom Corp Secret",
-        "password": True,
-    },
-    "WECOM_CALLBACK_AGENT_ID": {
-        "description": "WeCom app agent ID",
-        "prompt": "WeCom Agent ID",
-    },
-    "WECOM_CALLBACK_TOKEN": {
-        "description": "WeCom callback verification token",
-        "prompt": "WeCom Token",
-    },
-    "WECOM_CALLBACK_ENCODING_AES_KEY": {
-        "description": "WeCom callback AES encoding key",
-        "prompt": "WeCom AES Key",
-        "password": True,
-    },
-    "WEIXIN_ACCOUNT_ID": {
-        "description": "iLink Bot account ID obtained through QR login in hermes gateway setup",
-        "prompt": "iLink Bot account ID",
-    },
-    "WEIXIN_TOKEN": {
-        "description": "iLink Bot token obtained through QR login in hermes gateway setup",
-        "prompt": "iLink Bot token",
-        "password": True,
-    },
-    "WEIXIN_BASE_URL": {
-        "description": "iLink API base URL saved by QR login (default: https://ilinkai.weixin.qq.com)",
-        "prompt": "iLink API base URL",
-    },
-    "FEISHU_APP_ID": {"description": "Feishu / Lark app ID", "prompt": "App ID"},
-    "FEISHU_APP_SECRET": {
-        "description": "Feishu / Lark app secret",
-        "prompt": "App secret",
-        "password": True,
-    },
-    "FEISHU_ENCRYPT_KEY": {
-        "description": "Feishu / Lark encrypt key",
-        "prompt": "Encrypt key",
-        "password": True,
-    },
-    "FEISHU_VERIFICATION_TOKEN": {
-        "description": "Feishu / Lark verification token",
-        "prompt": "Verification token",
-        "password": True,
-    },
-    "DINGTALK_CLIENT_ID": {
-        "description": "DingTalk client ID (App key)",
-        "prompt": "Client ID",
-    },
-    "DINGTALK_CLIENT_SECRET": {
-        "description": "DingTalk client secret (App secret)",
-        "prompt": "Client secret",
         "password": True,
     },
 }
@@ -9616,10 +9478,7 @@ def _platform_env_prefixes(platform_id: str) -> tuple[str, ...]:
     aliases: dict[str, tuple[str, ...]] = {
         "email": ("EMAIL_",),
         "homeassistant": ("HASS_",),
-        "qqbot": ("QQ_", "QQBOT_"),
         "sms": ("TWILIO_",),
-        "wecom": ("WECOM_BOT_", "WECOM_SECRET"),
-        "wecom_callback": ("WECOM_CALLBACK_",),
     }
     if platform_id in aliases:
         return aliases[platform_id]

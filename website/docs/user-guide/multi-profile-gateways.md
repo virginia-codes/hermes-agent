@@ -156,7 +156,7 @@ configure them only on the default profile.
 ```
 
 Port-binding platforms covered by this rule: `webhook`, `api_server`,
-`msgraph_webhook`, `feishu`, `wecom_callback`, `bluebubbles`, `sms`,
+`msgraph_webhook`, `bluebubbles`, `sms`,
 `whatsapp_cloud`, `line`, `teams`. Configure any of these **only on the default profile**;
 every profile is reachable through its `/p/<profile>/` prefix.
 

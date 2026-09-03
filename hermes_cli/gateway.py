@@ -6932,12 +6932,6 @@ _PLATFORMS = [
     # discovered dynamically via the platform registry entries registered by
     # plugins/platforms/{email,sms}/adapter.py::register(). #41112.
     {
-        "key": "weixin",
-        "label": "Weixin / WeChat",
-        "emoji": "💬",
-        "token_var": "WEIXIN_ACCOUNT_ID",
-    },
-    {
         "key": "bluebubbles",
         "label": "BlueBubbles (iMessage)",
         "emoji": "💬",
@@ -6978,71 +6972,6 @@ _PLATFORMS = [
                 "prompt": "Home channel (phone number or iMessage ID for cron/notifications, or empty)",
                 "password": False,
                 "help": "Phone number or Apple ID to deliver cron results and notifications to.",
-            },
-        ],
-    },
-    {
-        "key": "qqbot",
-        "label": "QQ Bot",
-        "emoji": "🐧",
-        "token_var": "QQ_APP_ID",
-        "setup_instructions": [
-            "1. Register a QQ Bot application at q.qq.com",
-            "2. Note your App ID and App Secret from the application page",
-            "3. Enable the required intents (C2C, Group, Guild messages)",
-            "4. Configure sandbox or publish the bot",
-        ],
-        "vars": [
-            {
-                "name": "QQ_APP_ID",
-                "prompt": "QQ Bot App ID",
-                "password": False,
-                "help": "Your QQ Bot App ID from q.qq.com.",
-            },
-            {
-                "name": "QQ_CLIENT_SECRET",
-                "prompt": "QQ Bot App Secret",
-                "password": True,
-                "help": "Your QQ Bot App Secret from q.qq.com.",
-            },
-            {
-                "name": "QQ_ALLOWED_USERS",
-                "prompt": "Allowed user OpenIDs (comma-separated, leave empty for open access)",
-                "password": False,
-                "is_allowlist": True,
-                "help": "Optional — restrict DM access to specific user OpenIDs.",
-            },
-            {
-                "name": "QQBOT_HOME_CHANNEL",
-                "prompt": "Home channel (user/group OpenID for cron delivery, or empty)",
-                "password": False,
-                "help": "OpenID to deliver cron results and notifications to.",
-            },
-        ],
-    },
-    {
-        "key": "yuanbao",
-        "label": "Yuanbao",
-        "emoji": "💎",
-        "token_var": "YUANBAO_APP_ID",
-        "setup_instructions": [
-            "1. Download the Yuanbao app from https://yuanbao.tencent.com/",
-            "2. In the app, go to PAI → My Bot and create a new bot",
-            "3. After the bot is created, copy the App ID and App Secret",
-            "4. Enter them below and Hermes will connect automatically over WebSocket",
-        ],
-        "vars": [
-            {
-                "name": "YUANBAO_APP_ID",
-                "prompt": "App ID",
-                "password": False,
-                "help": "The App ID from your Yuanbao IM Bot credentials.",
-            },
-            {
-                "name": "YUANBAO_APP_SECRET",
-                "prompt": "App Secret",
-                "password": True,
-                "help": "The App Secret (used for HMAC signing) from your Yuanbao IM Bot.",
             },
         ],
     },
@@ -7180,13 +7109,6 @@ def _platform_status(platform: dict) -> str:
             suffix = " + E2EE" if e2ee and e2ee.lower() in {"true", "1", "yes"} else ""
             return f"configured{suffix}"
         if val or password or homeserver:
-            return "partially configured"
-        return "not configured"
-    if platform.get("key") == "weixin":
-        token = get_env_value("WEIXIN_TOKEN")
-        if val and token:
-            return "configured"
-        if val or token:
             return "partially configured"
         return "not configured"
     if val:
@@ -7452,12 +7374,11 @@ def _setup_standard_platform(platform: dict):
     print_success(f"{emoji} {label} configured!")
 
 
-# _setup_whatsapp and _setup_dingtalk moved into their plugins:
-# plugins/platforms/{whatsapp,dingtalk}/adapter.py::interactive_setup
+# _setup_whatsapp moved into its plugin:
+# plugins/platforms/whatsapp/adapter.py::interactive_setup
 # (registered via setup_fn, dispatched through the plugin path). #41112.
 
 
-# _setup_wecom moved to plugins/platforms/wecom/adapter.py::interactive_setup
 # (registered via setup_fn, dispatched through the plugin path). #41112.
 
 
@@ -7532,303 +7453,6 @@ def _is_service_running() -> bool:
             return len(find_gateway_pids()) > 0
     # Check for manual processes
     return len(find_gateway_pids()) > 0
-
-
-def _setup_weixin():
-    """Interactive setup for Weixin / WeChat personal accounts."""
-    print()
-    print(color("  ─── 💬 Weixin / WeChat Setup ───", Colors.CYAN))
-    print()
-    print_info("  1. Hermes will open Tencent iLink QR login in this terminal.")
-    print_info("  2. Use WeChat to scan and confirm the QR code.")
-    print_info(
-        "  3. Hermes will store the returned account_id/token in ~/.hermes/.env."
-    )
-    print_info(
-        "  4. This adapter supports native text, image, video, and document delivery."
-    )
-
-    existing_account = get_env_value("WEIXIN_ACCOUNT_ID")
-    existing_token = get_env_value("WEIXIN_TOKEN")
-    if existing_account and existing_token:
-        print()
-        print_success("Weixin is already configured.")
-        if not prompt_yes_no("  Reconfigure Weixin?", False):
-            return
-
-    try:
-        from gateway.platforms.weixin import check_weixin_requirements, qr_login
-    except Exception as exc:
-        print_error(f"  Weixin adapter import failed: {exc}")
-        print_info("  Install gateway dependencies first, then retry.")
-        return
-
-    if not check_weixin_requirements():
-        print_error("  Missing dependencies: Weixin needs aiohttp and cryptography.")
-        print_info("  Install them, then rerun `hermes gateway setup`.")
-        return
-
-    print()
-    if not prompt_yes_no("  Start QR login now?", True):
-        print_info("  Cancelled.")
-        return
-
-    import asyncio
-
-    try:
-        credentials = asyncio.run(qr_login(str(get_hermes_home())))
-    except KeyboardInterrupt:
-        print()
-        print_warning("  Weixin setup cancelled.")
-        return
-    except Exception as exc:
-        print_error(f"  QR login failed: {exc}")
-        return
-
-    if not credentials:
-        print_warning("  QR login did not complete.")
-        return
-
-    account_id = credentials.get("account_id", "")
-    token = credentials.get("token", "")
-    base_url = credentials.get("base_url", "")
-    user_id = credentials.get("user_id", "")
-
-    save_env_value("WEIXIN_ACCOUNT_ID", account_id)
-    save_env_value("WEIXIN_TOKEN", token)
-    if base_url:
-        save_env_value("WEIXIN_BASE_URL", base_url)
-    save_env_value(
-        "WEIXIN_CDN_BASE_URL",
-        get_env_value("WEIXIN_CDN_BASE_URL") or "https://novac2c.cdn.weixin.qq.com/c2c",
-    )
-
-    print()
-    access_choices = [
-        "Use DM pairing approval (recommended)",
-        "Allow all direct messages",
-        "Only allow listed user IDs",
-        "Disable direct messages",
-    ]
-    access_idx = prompt_choice(
-        "  How should direct messages be authorized?", access_choices, 0
-    )
-    if access_idx == 0:
-        save_env_value("WEIXIN_DM_POLICY", "pairing")
-        save_env_value("WEIXIN_ALLOW_ALL_USERS", "false")
-        save_env_value("WEIXIN_ALLOWED_USERS", "")
-        print_success("  DM pairing enabled.")
-        print_info(
-            "  Unknown DM users can request access and you approve them with `hermes pairing approve`."
-        )
-    elif access_idx == 1:
-        save_env_value("WEIXIN_DM_POLICY", "open")
-        save_env_value("WEIXIN_ALLOW_ALL_USERS", "true")
-        save_env_value("WEIXIN_ALLOWED_USERS", "")
-        print_warning("  Open DM access enabled for Weixin.")
-    elif access_idx == 2:
-        default_allow = user_id or ""
-        allowlist = prompt(
-            "  Allowed Weixin user IDs (comma-separated)", default_allow, password=False
-        ).replace(" ", "")
-        save_env_value("WEIXIN_DM_POLICY", "allowlist")
-        save_env_value("WEIXIN_ALLOW_ALL_USERS", "false")
-        save_env_value("WEIXIN_ALLOWED_USERS", allowlist)
-        print_success("  Weixin allowlist saved.")
-    else:
-        save_env_value("WEIXIN_DM_POLICY", "disabled")
-        save_env_value("WEIXIN_ALLOW_ALL_USERS", "false")
-        save_env_value("WEIXIN_ALLOWED_USERS", "")
-        print_warning("  Direct messages disabled.")
-
-    print()
-    print_info(
-        "  Note: QR login connects an iLink bot identity (e.g. ...@im.bot), not a"
-    )
-    print_info(
-        "  scriptable personal WeChat account. Ordinary WeChat groups typically cannot"
-    )
-    print_info(
-        "  invite an @im.bot identity, and iLink does not deliver ordinary-group events"
-    )
-    print_info(
-        "  to most bot accounts. The settings below only apply when iLink actually"
-    )
-    print_info(
-        "  delivers group events for your account type — otherwise DM remains the only"
-    )
-    print_info("  working channel regardless of this choice.")
-    group_choices = [
-        "Disable group chats (recommended)",
-        "Allow all group chats",
-        "Only allow listed group chat IDs",
-    ]
-    group_idx = prompt_choice("  How should group chats be handled?", group_choices, 0)
-    if group_idx == 0:
-        save_env_value("WEIXIN_GROUP_POLICY", "disabled")
-        save_env_value("WEIXIN_GROUP_ALLOWED_USERS", "")
-        print_info("  Group chats disabled.")
-    elif group_idx == 1:
-        save_env_value("WEIXIN_GROUP_POLICY", "open")
-        save_env_value("WEIXIN_GROUP_ALLOWED_USERS", "")
-        print_warning(
-            "  All group chats enabled (only takes effect if iLink delivers group events)."
-        )
-    else:
-        allow_groups = prompt(
-            "  Allowed group chat IDs (comma-separated, not member user IDs)",
-            "",
-            password=False,
-        ).replace(" ", "")
-        save_env_value("WEIXIN_GROUP_POLICY", "allowlist")
-        save_env_value("WEIXIN_GROUP_ALLOWED_USERS", allow_groups)
-        print_success(
-            "  Group allowlist saved (only takes effect if iLink delivers group events)."
-        )
-
-    if user_id:
-        print()
-        if prompt_yes_no(
-            f"  Use your Weixin user ID ({user_id}) as the home channel?", True
-        ):
-            save_env_value("WEIXIN_HOME_CHANNEL", user_id)
-            print_success(f"  Home channel set to {user_id}")
-
-    print()
-    print_success("Weixin configured!")
-    print_info(f"  Account ID: {account_id}")
-    if user_id:
-        print_info(f"  User ID: {user_id}")
-
-
-# _setup_feishu moved to plugins/platforms/feishu/adapter.py::interactive_setup
-# (registered via setup_fn, dispatched through the plugin path). #41112.
-
-
-def _setup_qqbot():
-    """Interactive setup for QQ Bot — scan-to-configure or manual credentials."""
-    print()
-    print(color("  ─── 🐧 QQ Bot Setup ───", Colors.CYAN))
-
-    existing_app_id = get_env_value("QQ_APP_ID")
-    existing_secret = get_env_value("QQ_CLIENT_SECRET")
-    if existing_app_id and existing_secret:
-        print()
-        print_success("QQ Bot is already configured.")
-        if not prompt_yes_no("  Reconfigure QQ Bot?", False):
-            return
-
-    # ── Choose setup method ──
-    print()
-    method_choices = [
-        "Scan QR code to add bot automatically (recommended)",
-        "Enter existing App ID and App Secret manually",
-    ]
-    method_idx = prompt_choice(
-        "  How would you like to set up QQ Bot?", method_choices, 0
-    )
-
-    credentials = None
-
-    if method_idx == 0:
-        # ── QR scan-to-configure ──
-        try:
-            from gateway.platforms.qqbot import qr_register
-
-            credentials = qr_register()
-        except KeyboardInterrupt:
-            print()
-            print_warning("  QQ Bot setup cancelled.")
-            return
-        if not credentials:
-            print_info("  QR setup did not complete. Continuing with manual input.")
-
-    # ── Manual credential input ──
-    if not credentials:
-        print()
-        print_info("  Go to https://q.qq.com to register a QQ Bot application.")
-        print_info("  Note your App ID and App Secret from the application page.")
-        print()
-        app_id = prompt("  App ID", password=False)
-        if not app_id:
-            print_warning("  Skipped — QQ Bot won't work without an App ID.")
-            return
-        app_secret = prompt("  App Secret", password=True)
-        if not app_secret:
-            print_warning("  Skipped — QQ Bot won't work without an App Secret.")
-            return
-        credentials = {
-            "app_id": app_id.strip(),
-            "client_secret": app_secret.strip(),
-            "user_openid": "",
-        }
-
-    # ── Save core credentials ──
-    save_env_value("QQ_APP_ID", credentials["app_id"])
-    save_env_value("QQ_CLIENT_SECRET", credentials["client_secret"])
-
-    user_openid = credentials.get("user_openid", "")
-
-    # ── DM security policy ──
-    print()
-    access_choices = [
-        "Use DM pairing approval (recommended)",
-        "Allow all direct messages",
-        "Only allow listed user OpenIDs",
-    ]
-    access_idx = prompt_choice(
-        "  How should direct messages be authorized?", access_choices, 0
-    )
-    if access_idx == 0:
-        save_env_value("QQ_ALLOW_ALL_USERS", "false")
-        if user_openid:
-            print()
-            if prompt_yes_no(
-                f"  Add yourself ({user_openid}) to the allow list?", True
-            ):
-                save_env_value("QQ_ALLOWED_USERS", user_openid)
-                print_success(f"  Allow list set to {user_openid}")
-            else:
-                save_env_value("QQ_ALLOWED_USERS", "")
-        else:
-            save_env_value("QQ_ALLOWED_USERS", "")
-        print_success("  DM pairing enabled.")
-        print_info(
-            "  Unknown users can request access; approve with `hermes pairing approve`."
-        )
-    elif access_idx == 1:
-        save_env_value("QQ_ALLOW_ALL_USERS", "true")
-        save_env_value("QQ_ALLOWED_USERS", "")
-        print_warning("  Open DM access enabled for QQ Bot.")
-    else:
-        default_allow = user_openid or ""
-        allowlist = prompt(
-            "  Allowed user OpenIDs (comma-separated)", default_allow, password=False
-        ).replace(" ", "")
-        save_env_value("QQ_ALLOW_ALL_USERS", "false")
-        save_env_value("QQ_ALLOWED_USERS", allowlist)
-        print_success("  Allowlist saved.")
-
-    # ── Home channel ──
-    if user_openid:
-        print()
-        if prompt_yes_no(
-            f"  Use your QQ user ID ({user_openid}) as the home channel?", True
-        ):
-            save_env_value("QQBOT_HOME_CHANNEL", user_openid)
-            print_success(f"  Home channel set to {user_openid}")
-    else:
-        print()
-        home_channel = prompt(
-            "  Home channel OpenID (for cron/notifications, or empty)", password=False
-        )
-        if home_channel:
-            save_env_value("QQBOT_HOME_CHANNEL", home_channel.strip())
-            print_success(f"  Home channel set to {home_channel.strip()}")
-
-    print()
-    print_success("🐧 QQ Bot configured!")
-    print_info(f"  App ID: {credentials['app_id']}")
 
 
 def _setup_signal():
@@ -7988,15 +7612,9 @@ def _builtin_setup_fn(key: str):
         "bluebubbles": _s._setup_bluebubbles,
         "webhooks": _s._setup_webhooks,
         "signal": _setup_signal,
-        # whatsapp + dingtalk moved into plugins: setup_fn registered by
-        # plugins/platforms/{whatsapp,dingtalk}/adapter.py::register() and
+        # whatsapp moved into a plugin: setup_fn registered by
+        # plugins/platforms/whatsapp/adapter.py::register() and
         # dispatched via the plugin path in _configure_platform(). #41112.
-        "weixin": _setup_weixin,
-        # feishu moved into the plugin: setup_fn registered by
-        # plugins/platforms/feishu/adapter.py::register(). #41112.
-        # wecom moved into the plugin: setup_fn registered by
-        # plugins/platforms/wecom/adapter.py::register(). #41112.
-        "qqbot": _setup_qqbot,
     }.get(key)
 
 

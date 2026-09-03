@@ -884,15 +884,11 @@ from hermes_cli.model_setup_flows import (
     _model_flow_nous,
     _model_flow_openai_codex,
     _model_flow_xai_oauth,
-    _model_flow_qwen_oauth,
-    _model_flow_minimax_oauth,
     _model_flow_custom,
     _model_flow_azure_foundry,
     _model_flow_named_custom,
     _model_flow_copilot,
     _model_flow_copilot_acp,
-    _model_flow_kimi,
-    _model_flow_stepfun,
     _model_flow_bedrock_api_key,
     _model_flow_bedrock,
     _model_flow_vertex,
@@ -4239,10 +4235,6 @@ def select_provider_and_model(args=None):
         _model_flow_openai_codex(config, current_model)
     elif selected_provider == "xai-oauth":
         _model_flow_xai_oauth(config, current_model, args=args)
-    elif selected_provider == "qwen-oauth":
-        _model_flow_qwen_oauth(config, current_model)
-    elif selected_provider == "minimax-oauth":
-        _model_flow_minimax_oauth(config, current_model, args=args)
     elif selected_provider == "copilot-acp":
         _model_flow_copilot_acp(config, current_model)
     elif selected_provider == "copilot":
@@ -4265,10 +4257,6 @@ def select_provider_and_model(args=None):
         _remove_custom_provider(config)
     elif selected_provider == "anthropic":
         _model_flow_anthropic(config, current_model)
-    elif selected_provider == "kimi-coding":
-        _model_flow_kimi(config, current_model)
-    elif selected_provider == "stepfun":
-        _model_flow_stepfun(config, current_model)
     elif selected_provider == "bedrock":
         _model_flow_bedrock(config, current_model)
     elif selected_provider == "vertex":
@@ -4278,25 +4266,16 @@ def select_provider_and_model(args=None):
     elif selected_provider in {
         "openai-api",
         "gemini",
-        "deepseek",
         "xai",
-        "zai",
-        "kimi-coding-cn",
-        "minimax",
-        "minimax-cn",
         "kilocode",
         "opencode-zen",
         "opencode-go",
         "opencode-free",
-        "alibaba",
         "huggingface",
-        "xiaomi",
         "arcee",
         "gmi",
         "nvidia",
         "ollama-cloud",
-        "tencent-tokenhub",
-        "tencent-tokenplan",
         "lmstudio",
     } or _is_profile_api_key_provider(selected_provider):
         _model_flow_api_key_provider(config, selected_provider, current_model)
@@ -4850,12 +4829,6 @@ def _prompt_provider_choice(choices, *, default=0, title="Select provider:"):
 
 
 
-
-
-_DEFAULT_QWEN_PORTAL_MODELS = [
-    "qwen3-coder-plus",
-    "qwen3-coder",
-]
 
 
 def _prompt_custom_api_mode_selection(base_url: str, current_api_mode: str = "") -> Optional[str]:
@@ -5513,25 +5486,6 @@ def _prompt_api_key(
 
 
 
-def _infer_stepfun_region(base_url: str) -> str:
-    """Infer the current StepFun region from the configured endpoint."""
-    normalized = (base_url or "").strip().lower()
-    if "api.stepfun.com" in normalized:
-        return "china"
-    return "international"
-
-
-def _stepfun_base_url_for_region(region: str) -> str:
-    from hermes_cli.auth import (
-        STEPFUN_STEP_PLAN_CN_BASE_URL,
-        STEPFUN_STEP_PLAN_INTL_BASE_URL,
-    )
-
-    return (
-        STEPFUN_STEP_PLAN_CN_BASE_URL
-        if region == "china"
-        else STEPFUN_STEP_PLAN_INTL_BASE_URL
-    )
 
 
 
@@ -12653,9 +12607,8 @@ def _build_provider_choices() -> list[str]:
         return [
             "auto", "openrouter", "nous", "openai-codex", "xai-oauth", "copilot-acp", "copilot",
             "anthropic", "gemini", "vertex", "xai", "bedrock", "azure-foundry",
-            "ollama-cloud", "huggingface", "zai", "kimi-coding", "kimi-coding-cn",
-            "stepfun", "minimax", "minimax-cn", "kilocode", "novita", "xiaomi", "arcee",
-            "nvidia", "deepseek", "alibaba", "qwen-oauth", "opencode-zen", "opencode-go",
+            "ollama-cloud", "huggingface", "kilocode", "novita", "arcee",
+            "nvidia", "opencode-zen", "opencode-go", "upstage", "gmi", "fireworks",
         ]
 
 

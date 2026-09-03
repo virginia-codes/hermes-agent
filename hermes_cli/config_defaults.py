@@ -1661,10 +1661,6 @@ DEFAULT_CONFIG = {
             "telegram": {"streaming": True},
             "discord": {"streaming": False},
             "slack": {"streaming": False},
-            # WeCom uses native streaming (msgtype: "stream") via
-            # aibot_respond_msg — opt in by default so the WeCom client
-            # renders the typing animation and cumulative content updates.
-            "wecom": {"streaming": True},
         },
         # Gateway runtime-metadata footer appended to the FINAL message of a turn
         # (disabled by default to keep replies minimal). When enabled, renders
@@ -2131,8 +2127,8 @@ DEFAULT_CONFIG = {
         # store reserved for explicit high-frequency operational facts.
         "nudge_interval": 10,
         # External memory provider plugin (empty = built-in only).
-        # Set to a provider name to activate: "openviking", "mem0",
-        # "hindsight", "holographic", "retaindb", "byterover".
+        # Set to a provider name to activate: "mem0", "hindsight",
+        # "holographic", "retaindb", "byterover".
         # Only ONE external provider is allowed at a time.
         "provider": "",
     },
@@ -2140,7 +2136,7 @@ DEFAULT_CONFIG = {
     # Subagent delegation — override the provider:model used by delegate_task
     # so child agents can run on a different (cheaper/faster) provider and model.
     # Uses the same runtime provider resolution as CLI/gateway startup, so all
-    # configured providers (OpenRouter, Nous, Z.ai, Kimi, etc.) are supported.
+    # configured providers (OpenRouter, Nous, Anthropic, etc.) are supported.
     "delegation": {
         "model": "",       # e.g. "google/gemini-3-flash-preview" (empty = inherit parent model)
         "provider": "",    # e.g. "openrouter" (empty = inherit parent provider + credentials)
@@ -5117,48 +5113,6 @@ OPTIONAL_ENV_VARS = {
     "BLUEBUBBLES_ALLOW_ALL_USERS": {
         "description": "Allow all BlueBubbles users without allowlist",
         "prompt": "Allow All BlueBubbles Users",
-        "category": "messaging",
-    },
-    "QQ_APP_ID": {
-        "description": "QQ Bot App ID from QQ Open Platform (q.qq.com)",
-        "prompt": "QQ App ID",
-        "url": "https://q.qq.com",
-        "category": "messaging",
-    },
-    "QQ_CLIENT_SECRET": {
-        "description": "QQ Bot Client Secret from QQ Open Platform",
-        "prompt": "QQ Client Secret",
-        "password": True,
-        "category": "messaging",
-    },
-    "QQ_ALLOWED_USERS": {
-        "description": "Comma-separated QQ user IDs allowed to use the bot",
-        "prompt": "QQ Allowed Users",
-        "category": "messaging",
-    },
-    "QQ_GROUP_ALLOWED_USERS": {
-        "description": "Comma-separated QQ group IDs allowed to interact with the bot",
-        "prompt": "QQ Group Allowed Users",
-        "category": "messaging",
-    },
-    "QQ_ALLOW_ALL_USERS": {
-        "description": "Allow all QQ users without an allowlist (true/false)",
-        "prompt": "Allow All QQ Users",
-        "category": "messaging",
-    },
-    "QQBOT_HOME_CHANNEL": {
-        "description": "Default QQ channel/group for cron delivery and notifications",
-        "prompt": "QQ Home Channel",
-        "category": "messaging",
-    },
-    "QQBOT_HOME_CHANNEL_NAME": {
-        "description": "Display name for the QQ home channel",
-        "prompt": "QQ Home Channel Name",
-        "category": "messaging",
-    },
-    "QQ_SANDBOX": {
-        "description": "Enable QQ sandbox mode for development testing (true/false)",
-        "prompt": "QQ Sandbox Mode",
         "category": "messaging",
     },
     "IRC_SERVER": {

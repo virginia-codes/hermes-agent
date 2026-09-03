@@ -342,17 +342,10 @@ class Platform(Enum):
     HOMEASSISTANT = "homeassistant"
     EMAIL = "email"
     SMS = "sms"
-    DINGTALK = "dingtalk"
     API_SERVER = "api_server"
     WEBHOOK = "webhook"
     MSGRAPH_WEBHOOK = "msgraph_webhook"
-    FEISHU = "feishu"
-    WECOM = "wecom"
-    WECOM_CALLBACK = "wecom_callback"
-    WEIXIN = "weixin"
     BLUEBUBBLES = "bluebubbles"
-    QQBOT = "qqbot"
-    YUANBAO = "yuanbao"
     RELAY = "relay"  # generic relay adapter fronted by the connector (EXPERIMENTAL)
     @classmethod
     def _missing_(cls, value):
@@ -438,8 +431,6 @@ PORT_BINDING_PLATFORM_VALUES = frozenset({
     "webhook",
     "api_server",
     "msgraph_webhook",
-    "feishu",
-    "wecom_callback",
     "bluebubbles",
     "sms",
     "whatsapp_cloud",
@@ -447,20 +438,16 @@ PORT_BINDING_PLATFORM_VALUES = frozenset({
     "teams",
 })
 
-# Platforms whose port-binding status depends on connection mode. Feishu in
-# websocket mode (its default) uses an outbound long connection — no listener.
-# Only webhook/callback mode binds a port. Maps platform value → the mode
-# value that actually binds (#52563).
-PORT_BINDING_CONDITIONAL_MODES: dict[str, str] = {
-    "feishu": "webhook",
-}
+# Platforms whose port-binding status depends on connection mode. Maps
+# platform value → the mode value that actually binds (#52563).
+PORT_BINDING_CONDITIONAL_MODES: dict[str, str] = {}
 
 
 def platform_binds_port(platform_value: str, extra: Optional[dict] = None) -> bool:
     """Return True when *platform_value* actually binds a port for *extra* config.
 
-    Mode-conditional platforms (Feishu) only bind in their listener mode;
-    everything else in ``PORT_BINDING_PLATFORM_VALUES`` always binds.
+    Mode-conditional platforms only bind in their listener mode; everything
+    else in ``PORT_BINDING_PLATFORM_VALUES`` always binds.
     """
     if platform_value not in PORT_BINDING_PLATFORM_VALUES:
         return False
@@ -640,7 +627,6 @@ PLATFORM_TOKEN_ENV_NAMES: dict["Platform", str] = {
     Platform.SLACK: "SLACK_BOT_TOKEN",
     Platform.MATTERMOST: "MATTERMOST_TOKEN",
     Platform.MATRIX: "MATRIX_ACCESS_TOKEN",
-    Platform.WEIXIN: "WEIXIN_TOKEN",
 }
 
 
@@ -890,9 +876,6 @@ def _has_usable_api_server_key(key: object) -> bool:
 
 
 _PLATFORM_CONNECTED_CHECKERS: dict[Platform, Callable[[PlatformConfig], bool]] = {
-    Platform.WEIXIN: lambda cfg: bool(
-        cfg.extra.get("account_id") and (cfg.token or cfg.extra.get("token"))
-    ),
     Platform.WHATSAPP_CLOUD: lambda cfg: bool(
         cfg.extra.get("phone_number_id") and cfg.extra.get("access_token")
     ),
@@ -906,12 +889,6 @@ _PLATFORM_CONNECTED_CHECKERS: dict[Platform, Callable[[PlatformConfig], bool]] =
     ),
     Platform.BLUEBUBBLES: lambda cfg: bool(
         cfg.extra.get("server_url") and cfg.extra.get("password")
-    ),
-    Platform.QQBOT: lambda cfg: bool(
-        cfg.extra.get("app_id") and cfg.extra.get("client_secret")
-    ),
-    Platform.YUANBAO: lambda cfg: bool(
-        cfg.extra.get("app_id") and cfg.extra.get("app_secret")
     ),
     # Relay dials OUT to a connector; it is "connected" once an endpoint URL is
     # configured (extra["relay_url"] or extra["url"]). The capability descriptor
@@ -1062,14 +1039,6 @@ class GatewayConfig:
 
     def _is_platform_connected(self, platform: Platform, config: PlatformConfig) -> bool:
         """Check whether a single platform is sufficiently configured."""
-        # Weixin requires both a token and an account_id (checked first so
-        # the generic token branch doesn't let it through without account_id).
-        if platform == Platform.WEIXIN:
-            return bool(
-                config.extra.get("account_id")
-                and (config.token or config.extra.get("token"))
-            )
-
         # Generic token/api_key auth covers Telegram, Discord, Slack, etc.
         if config.token or config.api_key:
             return True
@@ -1804,7 +1773,7 @@ def load_gateway_config() -> GatewayConfig:
                     # Mark the explicit enable/disable so the registry-driven
                     # plugin-enable pass in _apply_env_overrides honors an
                     # explicit ``enabled: false`` for migrated plugin platforms
-                    # (slack, telegram, matrix, dingtalk, whatsapp, feishu …)
+                    # (slack, telegram, matrix, whatsapp, discord …)
                     # instead of re-enabling them on token/SDK presence. #41112.
                     extra["_enabled_explicit"] = True
                 extra.update(bridged)
@@ -1885,19 +1854,11 @@ def load_gateway_config() -> GatewayConfig:
                 if "require_mention" in signal_cfg and not os.getenv("SIGNAL_REQUIRE_MENTION"):
                     os.environ["SIGNAL_REQUIRE_MENTION"] = str(signal_cfg["require_mention"]).lower()
 
-            # DingTalk settings → env vars: migrated to the dingtalk plugin's
-            # apply_yaml_config_fn hook (plugins/platforms/dingtalk/adapter.py).
-            # #41112 / #3823.
-
             # Mattermost config bridge moved into plugins/platforms/mattermost/
             # adapter.py::_apply_yaml_config — see #25443 (apply_yaml_config_fn).
 
             # Matrix settings → env vars: migrated to the matrix plugin's
             # apply_yaml_config_fn hook (plugins/platforms/matrix/adapter.py).
-            # #41112 / #3823.
-
-            # Feishu settings → env vars: migrated to the feishu plugin's
-            # apply_yaml_config_fn hook (plugins/platforms/feishu/adapter.py).
             # #41112 / #3823.
 
     except Exception as e:
@@ -2002,14 +1963,7 @@ _ENV_ENABLE_CREDENTIALS: dict = {
     Platform.HOMEASSISTANT: ("HASS_TOKEN",),
     Platform.EMAIL: ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "EMAIL_IMAP_HOST", "EMAIL_SMTP_HOST"),
     Platform.SMS: ("TWILIO_ACCOUNT_SID",),
-    Platform.DINGTALK: ("DINGTALK_CLIENT_ID", "DINGTALK_CLIENT_SECRET"),
-    Platform.FEISHU: ("FEISHU_APP_ID", "FEISHU_APP_SECRET"),
-    Platform.WECOM: ("WECOM_BOT_ID", "WECOM_SECRET"),
-    Platform.WECOM_CALLBACK: ("WECOM_CALLBACK_CORP_ID", "WECOM_CALLBACK_CORP_SECRET"),
-    Platform.WEIXIN: ("WEIXIN_TOKEN", "WEIXIN_ACCOUNT_ID"),
     Platform.BLUEBUBBLES: ("BLUEBUBBLES_SERVER_URL", "BLUEBUBBLES_PASSWORD"),
-    Platform.QQBOT: ("QQ_APP_ID", "QQ_CLIENT_SECRET"),
-    Platform.YUANBAO: ("YUANBAO_APP_ID", "YUANBAO_APP_SECRET"),
     Platform.RELAY: ("GATEWAY_RELAY_URL",),
 }
 
@@ -2488,134 +2442,6 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
                     "allowed_source_cidrs"
                 ] = cidrs
 
-    # DingTalk
-    dingtalk_client_id = getenv("DINGTALK_CLIENT_ID")
-    dingtalk_client_secret = getenv("DINGTALK_CLIENT_SECRET")
-    if dingtalk_client_id and dingtalk_client_secret:
-        # Honors an explicit ``platforms.dingtalk.enabled: false`` (#48820).
-        _enable_from_env(Platform.DINGTALK)
-        config.platforms[Platform.DINGTALK].extra.update({
-            "client_id": dingtalk_client_id,
-            "client_secret": dingtalk_client_secret,
-        })
-        dingtalk_home = getenv("DINGTALK_HOME_CHANNEL")
-        if dingtalk_home:
-            config.platforms[Platform.DINGTALK].home_channel = HomeChannel(
-                platform=Platform.DINGTALK,
-                chat_id=dingtalk_home,
-                name=getenv("DINGTALK_HOME_CHANNEL_NAME", "Home"),
-                thread_id=getenv("DINGTALK_HOME_CHANNEL_THREAD_ID") or None,
-            )
-
-    # Feishu / Lark
-    feishu_app_id = getenv("FEISHU_APP_ID")
-    feishu_app_secret = getenv("FEISHU_APP_SECRET")
-    if feishu_app_id and feishu_app_secret:
-        # Honors an explicit ``platforms.feishu.enabled: false`` (#48820).
-        _enable_from_env(Platform.FEISHU)
-        config.platforms[Platform.FEISHU].extra.update({
-            "app_id": feishu_app_id,
-            "app_secret": feishu_app_secret,
-            "domain": getenv("FEISHU_DOMAIN", "feishu"),
-            "connection_mode": getenv("FEISHU_CONNECTION_MODE", "websocket"),
-        })
-        feishu_encrypt_key = getenv("FEISHU_ENCRYPT_KEY", "")
-        if feishu_encrypt_key:
-            config.platforms[Platform.FEISHU].extra["encrypt_key"] = feishu_encrypt_key
-        feishu_verification_token = getenv("FEISHU_VERIFICATION_TOKEN", "")
-        if feishu_verification_token:
-            config.platforms[Platform.FEISHU].extra["verification_token"] = feishu_verification_token
-        feishu_home = getenv("FEISHU_HOME_CHANNEL")
-        if feishu_home:
-            config.platforms[Platform.FEISHU].home_channel = HomeChannel(
-                platform=Platform.FEISHU,
-                chat_id=feishu_home,
-                name=getenv("FEISHU_HOME_CHANNEL_NAME", "Home"),
-                thread_id=getenv("FEISHU_HOME_CHANNEL_THREAD_ID") or None,
-            )
-
-    # WeCom (Enterprise WeChat)
-    wecom_bot_id = getenv("WECOM_BOT_ID")
-    wecom_secret = getenv("WECOM_SECRET")
-    if wecom_bot_id and wecom_secret:
-        # Honors an explicit ``platforms.wecom.enabled: false`` (#48820).
-        _enable_from_env(Platform.WECOM)
-        config.platforms[Platform.WECOM].extra.update({
-            "bot_id": wecom_bot_id,
-            "secret": wecom_secret,
-        })
-        wecom_ws_url = getenv("WECOM_WEBSOCKET_URL", "")
-        if wecom_ws_url:
-            config.platforms[Platform.WECOM].extra["websocket_url"] = wecom_ws_url
-        wecom_home = getenv("WECOM_HOME_CHANNEL")
-        if wecom_home:
-            config.platforms[Platform.WECOM].home_channel = HomeChannel(
-                platform=Platform.WECOM,
-                chat_id=wecom_home,
-                name=getenv("WECOM_HOME_CHANNEL_NAME", "Home"),
-                thread_id=getenv("WECOM_HOME_CHANNEL_THREAD_ID") or None,
-            )
-
-    # WeCom callback mode (self-built apps)
-    wecom_callback_corp_id = getenv("WECOM_CALLBACK_CORP_ID")
-    wecom_callback_corp_secret = getenv("WECOM_CALLBACK_CORP_SECRET")
-    if wecom_callback_corp_id and wecom_callback_corp_secret:
-        # Honors an explicit ``platforms.wecom_callback.enabled: false`` (#48820).
-        _enable_from_env(Platform.WECOM_CALLBACK)
-        config.platforms[Platform.WECOM_CALLBACK].extra.update({
-            "corp_id": wecom_callback_corp_id,
-            "corp_secret": wecom_callback_corp_secret,
-            "agent_id": getenv("WECOM_CALLBACK_AGENT_ID", ""),
-            "token": getenv("WECOM_CALLBACK_TOKEN", ""),
-            "encoding_aes_key": getenv("WECOM_CALLBACK_ENCODING_AES_KEY", ""),
-            # No default here: an unset WECOM_CALLBACK_HOST leaves extra.host
-            # falsy so the adapter's dual-stack DEFAULT_HOST=None applies
-            # (binds IPv4 + IPv6; "0.0.0.0" was IPv4-only, NS-603).
-            "host": getenv("WECOM_CALLBACK_HOST", ""),
-            "port": getenv_int("WECOM_CALLBACK_PORT", 8645),
-        })
-
-    # Weixin (personal WeChat via iLink Bot API)
-    weixin_token = getenv("WEIXIN_TOKEN")
-    weixin_account_id = getenv("WEIXIN_ACCOUNT_ID")
-    if weixin_token or weixin_account_id:
-        # Honors an explicit ``platforms.weixin.enabled: false`` (#48820).
-        _enable_from_env(Platform.WEIXIN)
-        if weixin_token:
-            config.platforms[Platform.WEIXIN].token = weixin_token
-        extra = config.platforms[Platform.WEIXIN].extra
-        if weixin_account_id:
-            extra["account_id"] = weixin_account_id
-        weixin_base_url = getenv("WEIXIN_BASE_URL", "").strip()
-        if weixin_base_url:
-            extra["base_url"] = weixin_base_url.rstrip("/")
-        weixin_cdn_base_url = getenv("WEIXIN_CDN_BASE_URL", "").strip()
-        if weixin_cdn_base_url:
-            extra["cdn_base_url"] = weixin_cdn_base_url.rstrip("/")
-        weixin_dm_policy = getenv("WEIXIN_DM_POLICY", "").strip().lower()
-        if weixin_dm_policy:
-            extra["dm_policy"] = weixin_dm_policy
-        weixin_group_policy = getenv("WEIXIN_GROUP_POLICY", "").strip().lower()
-        if weixin_group_policy:
-            extra["group_policy"] = weixin_group_policy
-        weixin_allowed_users = getenv("WEIXIN_ALLOWED_USERS", "").strip()
-        if weixin_allowed_users:
-            extra["allow_from"] = weixin_allowed_users
-        weixin_group_allowed_users = getenv("WEIXIN_GROUP_ALLOWED_USERS", "").strip()
-        if weixin_group_allowed_users:
-            extra["group_allow_from"] = weixin_group_allowed_users
-        weixin_split_multiline = getenv("WEIXIN_SPLIT_MULTILINE_MESSAGES", "").strip()
-        if weixin_split_multiline:
-            extra["split_multiline_messages"] = weixin_split_multiline
-        weixin_home = getenv("WEIXIN_HOME_CHANNEL", "").strip()
-        if weixin_home:
-            config.platforms[Platform.WEIXIN].home_channel = HomeChannel(
-                platform=Platform.WEIXIN,
-                chat_id=weixin_home,
-                name=getenv("WEIXIN_HOME_CHANNEL_NAME", "Home"),
-                thread_id=getenv("WEIXIN_HOME_CHANNEL_THREAD_ID") or None,
-            )
-
     # BlueBubbles (iMessage)
     bluebubbles_server_url = getenv("BLUEBUBBLES_SERVER_URL")
     bluebubbles_password = getenv("BLUEBUBBLES_PASSWORD")
@@ -2654,89 +2480,6 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
             name=getenv("BLUEBUBBLES_HOME_CHANNEL_NAME", "Home"),
             thread_id=getenv("BLUEBUBBLES_HOME_CHANNEL_THREAD_ID") or None,
         )
-
-    # QQ (Official Bot API v2)
-    qq_app_id = getenv("QQ_APP_ID")
-    qq_client_secret = getenv("QQ_CLIENT_SECRET")
-    if qq_app_id or qq_client_secret:
-        # Honors an explicit ``platforms.qqbot.enabled: false`` (#48820).
-        _enable_from_env(Platform.QQBOT)
-        extra = config.platforms[Platform.QQBOT].extra
-        if qq_app_id:
-            extra["app_id"] = qq_app_id
-        if qq_client_secret:
-            extra["client_secret"] = qq_client_secret
-        qq_allowed_users = getenv("QQ_ALLOWED_USERS", "").strip()
-        if qq_allowed_users:
-            extra["allow_from"] = qq_allowed_users
-        qq_group_allowed = getenv("QQ_GROUP_ALLOWED_USERS", "").strip()
-        if qq_group_allowed:
-            extra["group_allow_from"] = qq_group_allowed
-        qq_home = getenv("QQBOT_HOME_CHANNEL", "").strip()
-        qq_home_name_env = "QQBOT_HOME_CHANNEL_NAME"
-        if not qq_home:
-            # Back-compat: accept the pre-rename name and log a one-time warning.
-            legacy_home = getenv("QQ_HOME_CHANNEL", "").strip()
-            if legacy_home:
-                qq_home = legacy_home
-                qq_home_name_env = "QQ_HOME_CHANNEL_NAME"
-                logging.getLogger(__name__).warning(
-                    "QQ_HOME_CHANNEL is deprecated; rename to QQBOT_HOME_CHANNEL "
-                    "in your .env for consistency with the platform key."
-                )
-        if qq_home:
-            config.platforms[Platform.QQBOT].home_channel = HomeChannel(
-                platform=Platform.QQBOT,
-                chat_id=qq_home,
-                name=getenv("QQBOT_HOME_CHANNEL_NAME") or getenv(qq_home_name_env, "Home"),
-                thread_id=(
-                    getenv("QQBOT_HOME_CHANNEL_THREAD_ID")
-                    or getenv("QQ_HOME_CHANNEL_THREAD_ID")
-                    or None
-                ),
-            )
-
-    # Yuanbao — YUANBAO_APP_ID preferred
-    yuanbao_app_id = getenv("YUANBAO_APP_ID") or getenv("YUANBAO_APP_KEY")
-    yuanbao_app_secret = getenv("YUANBAO_APP_SECRET")
-    if yuanbao_app_id and yuanbao_app_secret:
-        # Honors an explicit ``platforms.yuanbao.enabled: false`` (#48820).
-        _enable_from_env(Platform.YUANBAO)
-        extra = config.platforms[Platform.YUANBAO].extra
-        extra["app_id"] = yuanbao_app_id
-        extra["app_secret"] = yuanbao_app_secret
-        yuanbao_bot_id = getenv("YUANBAO_BOT_ID")
-        if yuanbao_bot_id:
-            extra["bot_id"] = yuanbao_bot_id
-        yuanbao_ws_url = getenv("YUANBAO_WS_URL")
-        if yuanbao_ws_url:
-            extra["ws_url"] = yuanbao_ws_url
-        yuanbao_api_domain = getenv("YUANBAO_API_DOMAIN")
-        if yuanbao_api_domain:
-            extra["api_domain"] = yuanbao_api_domain
-        yuanbao_route_env = getenv("YUANBAO_ROUTE_ENV")
-        if yuanbao_route_env:
-            extra["route_env"] = yuanbao_route_env
-        yuanbao_home = getenv("YUANBAO_HOME_CHANNEL")
-        if yuanbao_home:
-            config.platforms[Platform.YUANBAO].home_channel = HomeChannel(
-                platform=Platform.YUANBAO,
-                chat_id=yuanbao_home,
-                name=getenv("YUANBAO_HOME_CHANNEL_NAME", "Home"),
-                thread_id=getenv("YUANBAO_HOME_CHANNEL_THREAD_ID") or None,
-            )
-        yuanbao_dm_policy = getenv("YUANBAO_DM_POLICY")
-        if yuanbao_dm_policy:
-            extra["dm_policy"] = yuanbao_dm_policy.strip().lower()
-        yuanbao_dm_allow_from = getenv("YUANBAO_DM_ALLOW_FROM")
-        if yuanbao_dm_allow_from:
-            extra["dm_allow_from"] = yuanbao_dm_allow_from
-        yuanbao_group_policy = getenv("YUANBAO_GROUP_POLICY")
-        if yuanbao_group_policy:
-            extra["group_policy"] = yuanbao_group_policy.strip().lower()
-        yuanbao_group_allow_from = getenv("YUANBAO_GROUP_ALLOW_FROM")
-        if yuanbao_group_allow_from:
-            extra["group_allow_from"] = yuanbao_group_allow_from
 
     # Session settings
     idle_minutes = getenv("SESSION_IDLE_MINUTES")

@@ -407,6 +407,21 @@ def is_always_blocked_url(url: str) -> bool:
         return False
 
 
+def _blocked_prc_domain(url: str) -> Optional[str]:
+    """Return the blocked PRC service domain for *url*, or None.
+
+    Imported lazily: ``agent.blocked_endpoints`` pulls in ``utils``, and
+    ``tools.url_safety`` is imported early enough in startup that a
+    module-level import would widen the cold-start import graph.
+    """
+    try:
+        from agent.blocked_endpoints import blocked_domain_for
+
+        return blocked_domain_for(url)
+    except Exception:  # pragma: no cover - policy must never break fetching
+        return None
+
+
 def _allows_private_ip_resolution(hostname: str, scheme: str) -> bool:
     """Return True when a trusted HTTPS hostname may bypass IP-class blocking."""
     return scheme == "https" and hostname in _TRUSTED_PRIVATE_IP_HOSTS
@@ -436,6 +451,18 @@ def is_safe_url(url: str) -> bool:
         # Block known internal hostnames — ALWAYS, even with toggle on
         if hostname in _BLOCKED_HOSTNAMES:
             logger.warning("Blocked request to internal hostname: %s", hostname)
+            return False
+
+        # Block PRC-operated services Hermes no longer integrates with.
+        # Independent of the private-IP toggle: this is a policy block, not
+        # an SSRF one, and has its own HERMES_ALLOW_PRC_ENDPOINTS opt-out.
+        blocked_domain = _blocked_prc_domain(url)
+        if blocked_domain:
+            logger.warning(
+                "Blocked request to %s — PRC-operated service removed from Hermes "
+                "(see docs/removed-prc-integrations.md)",
+                blocked_domain,
+            )
             return False
 
         # Check the global toggle AFTER blocking metadata hostnames

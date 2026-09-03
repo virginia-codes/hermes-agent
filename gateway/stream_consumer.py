@@ -2771,7 +2771,7 @@ class GatewayStreamConsumer:
             # passing reply_to on every commentary creates reply spam.
             _plat = getattr(getattr(self.adapter, "platform", None), "value", None)
             _platform_name = str(_plat or getattr(self.adapter, "name", "")).lower()
-            _needs_reply_anchor = _platform_name in ("buzz", "slack", "mattermost", "feishu")
+            _needs_reply_anchor = _platform_name in ("buzz", "slack", "mattermost")
             result = await self.adapter.send(
                 chat_id=self.chat_id,
                 content=text,

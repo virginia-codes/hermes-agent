@@ -55,10 +55,7 @@ def profile_scope():
 @pytest.mark.parametrize(
     "module_path,helper_name,var",
     [
-        ("gateway.platforms.weixin", "_wx_secret", "WEIXIN_ALLOWED_USERS"),
-        ("gateway.platforms.yuanbao", "_yb_secret", "YUANBAO_DM_POLICY"),
         ("gateway.platforms.signal", "_sig_secret", "SIGNAL_ALLOWED_USERS"),
-        ("plugins.platforms.wecom.adapter", "_get_scoped_secret", "WECOM_ALLOWED_USERS"),
     ],
 )
 def test_helper_reads_profile_scope_first(module_path, helper_name, var, monkeypatch):
@@ -86,10 +83,7 @@ def multiplex_on(monkeypatch):
 @pytest.mark.parametrize(
     "module_path,helper_name",
     [
-        ("gateway.platforms.weixin", "_wx_secret"),
-        ("gateway.platforms.yuanbao", "_yb_secret"),
         ("gateway.platforms.signal", "_sig_secret"),
-        ("plugins.platforms.wecom.adapter", "_get_scoped_secret"),
     ],
 )
 def test_helper_does_not_leak_default_env_into_scoped_miss(
@@ -101,18 +95,12 @@ def test_helper_does_not_leak_default_env_into_scoped_miss(
     ``*_ALLOW_ALL_USERS=true`` in process env must not answer a secondary
     profile's gate.
     """
-    monkeypatch.setenv("WEIXIN_ALLOW_ALL_USERS", "true")
-    monkeypatch.setenv("YUANBAO_ALLOW_ALL_USERS", "true")
     monkeypatch.setenv("SIGNAL_ALLOWED_USERS", "*")
-    monkeypatch.setenv("WECOM_ALLOW_ALL_USERS", "true")
 
     module = __import__(module_path, fromlist=[helper_name])
     helper = getattr(module, helper_name)
 
     with _scope({}):  # scope installed, keys absent
-        assert helper("WEIXIN_ALLOW_ALL_USERS", "") == ""
-        assert helper("YUANBAO_ALLOW_ALL_USERS", "") == ""
-        assert helper("WECOM_ALLOW_ALL_USERS", "") == ""
         # signal's "*" default means open at adapter level — the scoped
         # read must still not see the unscoped value:
         assert helper("SIGNAL_ALLOWED_USERS", "restricted-default") == "restricted-default"
@@ -121,10 +109,7 @@ def test_helper_does_not_leak_default_env_into_scoped_miss(
 @pytest.mark.parametrize(
     "module_path,helper_name,var",
     [
-        ("gateway.platforms.weixin", "_wx_secret", "WEIXIN_ALLOWED_USERS"),
-        ("gateway.platforms.yuanbao", "_yb_secret", "YUANBAO_DM_POLICY"),
         ("gateway.platforms.signal", "_sig_secret", "SIGNAL_ALLOWED_USERS"),
-        ("plugins.platforms.wecom.adapter", "_get_scoped_secret", "WECOM_ALLOWED_USERS"),
     ],
 )
 def test_helper_falls_back_to_environ_without_scope(module_path, helper_name, var, monkeypatch):
@@ -140,45 +125,6 @@ def test_helper_falls_back_to_environ_without_scope(module_path, helper_name, va
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_weixin_open_gate_ignores_default_env_under_scope(profile_scope, multiplex_on, monkeypatch):
-    """Default profile sets GATEWAY_ALLOW_ALL_USERS=true; secondary scope does
-    NOT carry it — the gate must stay closed."""
-    monkeypatch.setenv("GATEWAY_ALLOW_ALL_USERS", "true")
-
-    from gateway.platforms.weixin import WeixinAdapter
-
-    adapter = WeixinAdapter.__new__(WeixinAdapter)
-    assert adapter._open_dm_opted_in() is False
-
-
-def test_weixin_open_gate_honors_scope_opt_in():
-    from gateway.platforms.weixin import WeixinAdapter
-
-    with _scope({"WEIXIN_ALLOW_ALL_USERS": "yes"}):
-        adapter = WeixinAdapter.__new__(WeixinAdapter)
-        assert adapter._open_dm_opted_in() is True
-
-
-def test_yuanbao_access_policy_gate_ignores_default_env(profile_scope, multiplex_on, monkeypatch):
-    monkeypatch.setenv("GATEWAY_ALLOW_ALL_USERS", "true")
-
-    from gateway.platforms.yuanbao import AccessPolicy
-
-    policy = AccessPolicy(
-        dm_policy="open", dm_allow_from=[], group_policy="pairing", group_allow_from=[]
-    )
-    assert policy._open_dm_opted_in() is False
-
-
-def test_wecom_open_gate_ignores_default_env_under_scope(profile_scope, multiplex_on, monkeypatch):
-    monkeypatch.setenv("GATEWAY_ALLOW_ALL_USERS", "true")
-
-    from plugins.platforms.wecom.adapter import WeComAdapter
-
-    adapter = WeComAdapter.__new__(WeComAdapter)
-    assert adapter._open_dm_opted_in() is False
-
-
 def test_startup_guard_uses_scoped_gateway_flag(multiplex_on):
     """_own_policy_open_startup_violation must consult the scope for
     GATEWAY_ALLOW_ALL_USERS, not raw os.environ (#93522)."""
@@ -190,7 +136,7 @@ def test_startup_guard_uses_scoped_gateway_flag(multiplex_on):
         extra = {"dm_policy": "open"}
 
     class _Config:
-        platforms = {Platform.YUANBAO: _PlatformConfig()}
+        platforms = {Platform.WHATSAPP: _PlatformConfig()}
 
     cfg = _Config()
     with _scope({"GATEWAY_ALLOW_ALL_USERS": "true"}):
@@ -204,7 +150,7 @@ def test_startup_guard_uses_scoped_gateway_flag(multiplex_on):
         os.environ["GATEWAY_ALLOW_ALL_USERS"] = "true"
         try:
             reason = _own_policy_open_startup_violation(cfg)
-            assert reason is not None and "yuanbao" in reason.lower()
+            assert reason is not None and "whatsapp" in reason.lower()
         finally:
             if monkey_env_backup is None:
                 os.environ.pop("GATEWAY_ALLOW_ALL_USERS", None)

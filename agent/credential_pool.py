@@ -34,8 +34,6 @@ from hermes_cli.auth import (
     _load_auth_store,
     _load_provider_state,
     _load_provider_state_with_source,
-    _resolve_kimi_base_url,
-    _resolve_zai_base_url,
     _same_path,
     _save_auth_store,
     _save_provider_state,
@@ -3346,78 +3344,6 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
         except Exception as exc:
             logger.debug("Copilot token seed failed: %s", exc)
 
-    elif provider == "qwen-oauth":
-        # Qwen OAuth tokens live in ~/.qwen/oauth_creds.json, written by
-        # the Qwen CLI (`qwen auth qwen-oauth`).  They aren't in the
-        # Hermes auth store or env vars, so resolve them here.
-        # Use refresh_if_expiring=False to avoid network calls during
-        # pool loading / provider discovery.
-        try:
-            from hermes_cli.auth import resolve_qwen_runtime_credentials
-            creds = resolve_qwen_runtime_credentials(refresh_if_expiring=False)
-            token = creds.get("api_key", "")
-            if token:
-                source_name = creds.get("source", "qwen-cli")
-                if not _is_suppressed(provider, source_name):
-                    active_sources.add(source_name)
-                    changed |= _upsert_entry(
-                        entries,
-                        provider,
-                        source_name,
-                        {
-                            "source": source_name,
-                            "auth_type": AUTH_TYPE_OAUTH,
-                            "access_token": token,
-                            "expires_at_ms": creds.get("expires_at_ms"),
-                            "base_url": creds.get("base_url", ""),
-                            "label": creds.get("auth_file", source_name),
-                        },
-                    )
-        except Exception as exc:
-            logger.debug("Qwen OAuth token seed failed: %s", exc)
-
-    elif provider == "minimax-oauth":
-        # MiniMax OAuth tokens live in ~/.hermes/auth.json providers.minimax-oauth.
-        # Seed the pool so `/auth list` reflects the logged-in state and the
-        # standard `hermes auth remove minimax-oauth <N>` flow works.
-        # Use refresh_if_expiring=False equivalent: resolve_minimax_oauth_runtime_credentials
-        # always refreshes on expiry, so instead read raw state here to avoid
-        # surprise network calls during provider discovery.
-        try:
-            from hermes_cli.auth import get_provider_auth_state
-            state = get_provider_auth_state("minimax-oauth")
-            if state and state.get("access_token"):
-                source_name = "oauth"
-                if not _is_suppressed(provider, source_name):
-                    active_sources.add(source_name)
-                    expires_at_ms = None
-                    try:
-                        from datetime import datetime as _dt
-                        raw = state.get("expires_at", "")
-                        if raw:
-                            expires_at_ms = int(_dt.fromisoformat(raw).timestamp() * 1000)
-                    except Exception:
-                        expires_at_ms = None
-                    base_url = str(state.get("inference_base_url", "") or "").rstrip("/")
-                    changed |= _upsert_entry(
-                        entries,
-                        provider,
-                        source_name,
-                        {
-                            "source": source_name,
-                            "auth_type": AUTH_TYPE_OAUTH,
-                            "access_token": state["access_token"],
-                            "refresh_token": state.get("refresh_token"),
-                            "expires_at_ms": expires_at_ms,
-                            "base_url": base_url,
-                            "label": state.get("label", "") or label_from_token(
-                                state.get("access_token", ""), source_name
-                            ),
-                        },
-                    )
-        except Exception as exc:
-            logger.debug("MiniMax OAuth token seed failed: %s", exc)
-
     elif provider == "openai-codex":
         # Respect user suppression — `hermes auth remove openai-codex` marks
         # the device_code source as suppressed so it won't be re-seeded from
@@ -3654,10 +3580,6 @@ def _seed_from_env(provider: str, entries: List[PooledCredential]) -> Tuple[bool
             continue
         active_sources.add(source)
         base_url = env_url or pconfig.inference_base_url
-        if provider == "kimi-coding":
-            base_url = _resolve_kimi_base_url(token, pconfig.inference_base_url, env_url)
-        elif provider == "zai":
-            base_url = _resolve_zai_base_url(token, pconfig.inference_base_url, env_url)
         changed |= _upsert_entry(
             entries,
             provider,

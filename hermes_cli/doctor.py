@@ -568,8 +568,6 @@ _DEPRECATED_ENV_VARS: tuple[tuple[str, str], ...] = (
     ("HERMES_TOOL_PROGRESS_MODE", "display.tool_progress in config.yaml"),
     ("TERMINAL_CWD", "terminal.cwd in config.yaml"),
     ("MESSAGING_CWD", "terminal.cwd in config.yaml"),
-    ("QQ_HOME_CHANNEL", "QQBOT_HOME_CHANNEL"),
-    ("QQ_HOME_CHANNEL_NAME", "QQBOT_HOME_CHANNEL_NAME"),
 )
 
 
@@ -3356,7 +3354,7 @@ def run_doctor(args):
         except Exception as _e:
             check_warn("Mem0 check failed", str(_e))
     else:
-        # Generic check for other memory providers (openviking, hindsight, etc.)
+        # Generic check for other memory providers (hindsight, mem0, etc.)
         try:
             from plugins.memory import load_memory_provider
             _provider = load_memory_provider(_active_memory_provider)

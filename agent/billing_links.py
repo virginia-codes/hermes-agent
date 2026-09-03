@@ -55,7 +55,6 @@ _PROVIDERS: tuple[_Provider, ...] = (
     _Provider("Anthropic", "https://console.anthropic.com/settings/billing", ("anthropic",), ("api.anthropic.com",)),
     _Provider("OpenRouter", "https://openrouter.ai/settings/credits", ("openrouter",), ("openrouter.ai",)),
     _Provider("xAI", "https://console.x.ai/team/default/billing", ("xai", "xai-oauth"), ("api.x.ai",)),
-    _Provider("DeepSeek", "https://platform.deepseek.com/top_up", ("deepseek",), ("api.deepseek.com",)),
     _Provider("Groq", "https://console.groq.com/settings/billing", ("groq",), ("api.groq.com",)),
     _Provider("Mistral", "https://console.mistral.ai/billing", ("mistral",), ("api.mistral.ai",)),
     _Provider("Together AI", "https://api.together.ai/settings/billing", ("together",), ("api.together.ai", "api.together.xyz")),
@@ -63,7 +62,6 @@ _PROVIDERS: tuple[_Provider, ...] = (
     _Provider("Perplexity", "https://www.perplexity.ai/settings/api", ("perplexity",), ("perplexity.ai",)),
     _Provider("Google AI", "https://aistudio.google.com/app/billing", ("google", "gemini"), ("generativelanguage.googleapis.com",)),
     _Provider("Cohere", "https://dashboard.cohere.com/billing", ("cohere",)),
-    _Provider("Moonshot AI", "https://platform.moonshot.ai/console/pay", ("moonshot",)),
     _Provider("NVIDIA", "https://build.nvidia.com/settings/billing", ("nvidia",)),
 )
 

@@ -76,12 +76,6 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
         base_url_override="https://api.x.ai/v1",
         base_url_env_var="XAI_BASE_URL",
     ),
-    "qwen-oauth": HermesOverlay(
-        transport="openai_chat",
-        auth_type="oauth_external",
-        base_url_override="https://portal.qwen.ai/v1",
-        base_url_env_var="HERMES_QWEN_BASE_URL",
-    ),
     "lmstudio": HermesOverlay(
         transport="openai_chat",
         auth_type="api_key",
@@ -102,46 +96,6 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
     "anthropic": HermesOverlay(
         transport="anthropic_messages",
         extra_env_vars=("ANTHROPIC_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"),
-    ),
-    "zai": HermesOverlay(
-        transport="openai_chat",
-        extra_env_vars=("GLM_API_KEY", "ZAI_API_KEY", "Z_AI_API_KEY"),
-        base_url_env_var="GLM_BASE_URL",
-    ),
-    "kimi-for-coding": HermesOverlay(
-        transport="openai_chat",
-        base_url_env_var="KIMI_BASE_URL",
-    ),
-    "stepfun": HermesOverlay(
-        transport="openai_chat",
-        extra_env_vars=("STEPFUN_API_KEY",),
-        base_url_override="https://api.stepfun.ai/step_plan/v1",
-        base_url_env_var="STEPFUN_BASE_URL",
-    ),
-    "minimax": HermesOverlay(
-        transport="anthropic_messages",
-        base_url_env_var="MINIMAX_BASE_URL",
-    ),
-    "minimax-oauth": HermesOverlay(
-        transport="anthropic_messages",
-        auth_type="oauth_external",
-        base_url_override="https://api.minimax.io/anthropic",
-    ),
-    "minimax-cn": HermesOverlay(
-        transport="anthropic_messages",
-        base_url_env_var="MINIMAX_CN_BASE_URL",
-    ),
-    "deepseek": HermesOverlay(
-        transport="openai_chat",
-        base_url_env_var="DEEPSEEK_BASE_URL",
-    ),
-    "alibaba": HermesOverlay(
-        transport="openai_chat",
-        base_url_env_var="DASHSCOPE_BASE_URL",
-    ),
-    "alibaba-coding-plan": HermesOverlay(
-        transport="openai_chat",
-        base_url_env_var="ALIBABA_CODING_PLAN_BASE_URL",
     ),
     "vercel": HermesOverlay(
         transport="openai_chat",
@@ -187,19 +141,6 @@ HERMES_OVERLAYS: Dict[str, HermesOverlay] = {
         transport="openai_chat",
         base_url_override="https://integrate.api.nvidia.com/v1",
         base_url_env_var="NVIDIA_BASE_URL",
-    ),
-    "xiaomi": HermesOverlay(
-        transport="openai_chat",
-        base_url_env_var="XIAOMI_BASE_URL",
-    ),
-    "tencent-tokenhub": HermesOverlay(
-        transport="openai_chat",
-        base_url_env_var="TOKENHUB_BASE_URL",
-    ),
-    "tencent-tokenplan": HermesOverlay(
-        transport="anthropic_messages",
-        base_url_override="https://api.lkeap.cloud.tencent.com/plan/anthropic",
-        base_url_env_var="TOKENPLAN_BASE_URL",
     ),
     "arcee": HermesOverlay(
         transport="openai_chat",
@@ -293,12 +234,6 @@ ALIASES: Dict[str, str] = {
     # openrouter
     "openai": "openrouter",     # bare "openai" → route through aggregator
 
-    # zai
-    "glm": "zai",
-    "z-ai": "zai",
-    "z.ai": "zai",
-    "zhipu": "zai",
-
     # xai
     "x-ai": "xai",
     "x.ai": "xai",
@@ -313,20 +248,6 @@ ALIASES: Dict[str, str] = {
     "nvidia-nim": "nvidia",
     "build-nvidia": "nvidia",
     "nemotron": "nvidia",
-
-    # kimi-for-coding (models.dev ID)
-    "kimi": "kimi-for-coding",
-    "kimi-coding": "kimi-for-coding",
-    "kimi-coding-cn": "kimi-for-coding",
-    "moonshot": "kimi-for-coding",
-
-    # stepfun
-    "step": "stepfun",
-    "stepfun-coding-plan": "stepfun",
-
-    # minimax-cn
-    "minimax-china": "minimax-cn",
-    "minimax_cn": "minimax-cn",
 
     # anthropic
     "claude": "anthropic",
@@ -359,18 +280,6 @@ ALIASES: Dict[str, str] = {
     "kilo-code": "kilo",
     "kilo-gateway": "kilo",
 
-    # deepseek
-    "deep-seek": "deepseek",
-
-    # alibaba
-    "dashscope": "alibaba",
-    "aliyun": "alibaba",
-    "qwen": "alibaba",
-    "alibaba-cloud": "alibaba",
-    "alibaba_coding": "alibaba-coding-plan",
-    "alibaba-coding": "alibaba-coding-plan",
-    "alibaba_coding_plan": "alibaba-coding-plan",
-
     # huggingface
     "hf": "huggingface",
     "hugging-face": "huggingface",
@@ -379,18 +288,6 @@ ALIASES: Dict[str, str] = {
     # novita
     "novita-ai": "novita",
     "novitaai": "novita",
-
-    # xiaomi
-    "mimo": "xiaomi",
-    "xiaomi-mimo": "xiaomi",
-
-    # tencent
-    "tencent": "tencent-tokenhub",
-    "tokenhub": "tencent-tokenhub",
-    "tencent-cloud": "tencent-tokenhub",
-    "tencentmaas": "tencent-tokenhub",
-    "tokenplan": "tencent-tokenplan",
-    "tencent-lkeap": "tencent-tokenplan",
 
     # bedrock
     "aws": "bedrock",
@@ -445,14 +342,10 @@ _LABEL_OVERRIDES: Dict[str, str] = {
     "nous": "Nous Portal",
     "openai-codex": "ChatGPT or Codex Subscription",
     "copilot-acp": "GitHub Copilot ACP",
-    "stepfun": "StepFun Step Plan",
-    "xiaomi": "Xiaomi MiMo",
     "gmi": "GMI Cloud",
     "upstage": "Upstage Solar",
     "actual": "Actual Computer",
-    "tencent-tokenhub": "Tencent TokenHub",
     "nebius-token-factory": "Nebius Token Factory",
-    "tencent-tokenplan": "Tencent TokenPlan",
     "lmstudio": "LM Studio",
     "local": "Local endpoint",
     "bedrock": "AWS Bedrock",
@@ -559,8 +452,8 @@ def get_provider(name: str, *, allow_network: bool = True) -> Optional[ProviderD
         )
 
     # Plugin-registered provider profiles (plugins/model-providers/<name>/).
-    # Providers that ship only as plugin profiles (e.g. commandcode,
-    # tencent-tokenhub) are absent from models.dev and HERMES_OVERLAYS, so
+    # Providers that ship only as plugin profiles (e.g. commandcode) are
+    # absent from models.dev and HERMES_OVERLAYS, so
     # without this fallback they resolve as "Unknown provider" in /model,
     # --provider, and the model-switch path even though the picker lists them
     # (CANONICAL_PROVIDERS auto-extends from the same plugin registry).
@@ -621,13 +514,13 @@ def is_aggregator(provider: str) -> bool:
 
 # Flat-namespace resellers (e.g. opencode-go, opencode-zen) are flagged
 # ``is_aggregator=True`` because their live ``/v1/models`` returns bare model
-# IDs ("deepseek-v4-flash") rather than ``vendor/model`` routing slugs — the
+# IDs ("grok-4-fast") rather than ``vendor/model`` routing slugs — the
 # model-switch resolver relies on that flag to search their flat catalog
 # (see model_switch.py step d). But they are NOT routing aggregators: every
 # model they list is a first-party model served under their own subscription,
 # not a passthrough route to another provider's endpoint. The picker dedup
 # (build_models_payload) must treat them differently from true routers like
-# OpenRouter — a reseller's first-party "minimax-m3" must never be stripped
+# OpenRouter — a reseller's first-party model must never be stripped
 # just because a user's custom proxy also happens to serve a same-named model.
 _FLAT_NAMESPACE_RESELLERS: frozenset[str] = frozenset({
     # Use normalized provider IDs: normalize_provider("opencode-zen") -> "opencode".
@@ -705,8 +598,6 @@ def host_mandated_api_mode(base_url: str = "") -> Optional[str]:
     # Exact-hostname matching only — never bare substring — so lookalike hosts
     # (api.openai.com.attacker.test) and path-segment spoofs
     # (proxy.test/api.openai.com/v1) are NOT treated as the real endpoint. (#32243)
-    if hostname == "api.kimi.com" and "/coding" in url_lower:
-        return "anthropic_messages"
     if hostname == "api.anthropic.com" or url_lower.endswith("/anthropic"):
         return "anthropic_messages"
     # Official OpenAI host family: canonical + data-residency regional hosts
@@ -789,6 +680,16 @@ def determine_api_mode(provider: str, base_url: str = "", model: str = "") -> st
 
 # -- Provider from user config ------------------------------------------------
 
+def _is_blocked_endpoint(url: str) -> bool:
+    """Return True when *url* names a removed PRC-operated service."""
+    try:
+        from agent.blocked_endpoints import is_blocked_endpoint
+
+        return is_blocked_endpoint(url)
+    except Exception:  # pragma: no cover - policy must not break resolution
+        return False
+
+
 def resolve_user_provider(name: str, user_config: Dict[str, Any]) -> Optional[ProviderDef]:
     """Resolve a provider from the user's config.yaml ``providers:`` section.
 
@@ -815,6 +716,17 @@ def resolve_user_provider(name: str, user_config: Dict[str, Any]) -> Optional[Pr
     env_vars: List[str] = []
     if key_env:
         env_vars.append(key_env)
+
+    # A ``providers:`` entry is user-supplied and can name any host. Refuse
+    # the removed PRC-operated services rather than routing to them.
+    if _is_blocked_endpoint(api_url):
+        logger.warning(
+            "Ignoring provider %r — %s is a PRC-operated service removed from "
+            "Hermes (see docs/removed-prc-integrations.md)",
+            name,
+            api_url,
+        )
+        return None
 
     return ProviderDef(
         id=name,
@@ -890,6 +802,17 @@ def resolve_custom_provider(
             or ""
         ).strip()
         if not display_name or not api_url:
+            continue
+
+        # A custom_providers entry is user-supplied and can name any host.
+        # Skip the removed PRC-operated services rather than routing to them.
+        if _is_blocked_endpoint(api_url):
+            logger.warning(
+                "Ignoring custom provider %r — %s is a PRC-operated service "
+                "removed from Hermes (see docs/removed-prc-integrations.md)",
+                display_name,
+                api_url,
+            )
             continue
 
         key_env = (entry.get("key_env") or "").strip()
@@ -973,8 +896,6 @@ def resolve_provider_full(
             return user_pdef
 
     # 0.5 Exact Hermes provider IDs must win over LOSSY alias collapsing.
-    # Example: kimi-coding-cn should stay distinct from kimi-coding instead of
-    # normalizing through the shared models.dev alias "kimi-for-coding".
     # A collapse is lossy only when MULTIPLE distinct registry providers
     # normalize to the same canonical name — resolving through the alias
     # would then lose which one the caller meant. Single-entry rewrites

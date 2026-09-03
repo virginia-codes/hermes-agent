@@ -19,7 +19,6 @@ from agent.secret_scope import get_secret
 logger = logging.getLogger(__name__)
 
 _TELEGRAM_TOPIC_TARGET_RE = re.compile(r"^\s*(-?\d+)(?::(\d+))?\s*$")
-_FEISHU_TARGET_RE = re.compile(r"^\s*((?:oc|ou|on|chat|open)_[-A-Za-z0-9]+)(?::([-A-Za-z0-9_]+))?\s*$")
 # Slack conversation IDs: C (public channel), G (private/group channel), D (DM).
 # Must be uppercase alphanumeric, 9+ chars. User IDs (U...) are parsed as
 # explicit user targets (``user:U...``) and are converted to D... conversations
@@ -32,8 +31,6 @@ _SLACK_USER_NAME_RE = re.compile(r"^\s*@([A-Za-z0-9._-]{1,80})\s*$")
 _SLACK_MENTION_RE = re.compile(r"^\s*<@(U[A-Z0-9]{8,})(?:\|[^>]+)?>\s*$")
 # Session-derived Slack thread targets use "<conversation_id>:<thread_ts>".
 _SLACK_THREAD_TARGET_RE = re.compile(r"^\s*([CGD][A-Z0-9]{8,}):([^\s:]+)\s*$")
-_WEIXIN_TARGET_RE = re.compile(r"^\s*((?:wxid|gh|v\d+|wm|wb)_[A-Za-z0-9_-]+|[A-Za-z0-9._-]+@chatroom|filehelper)\s*$")
-_YUANBAO_TARGET_RE = re.compile(r"^\s*((?:group|direct):[^:]+)\s*$")
 # Discord snowflake IDs are numeric, same regex pattern as Telegram topic targets.
 _NUMERIC_TOPIC_RE = _TELEGRAM_TOPIC_TARGET_RE
 # Platforms that address recipients by phone number and accept E.164 format
@@ -231,7 +228,7 @@ SEND_MESSAGE_SCHEMA = {
             },
             "target": {
                 "type": "string",
-                "description": "Delivery target. Format: 'platform' (uses home channel), 'platform:#channel-name', 'platform:chat_id', or 'platform:chat_id:thread_id' for Telegram topics and Discord threads. Examples: 'telegram', 'telegram:-1001234567890:17585', 'discord:999888777:555444333', 'discord:#bot-home', 'slack:#engineering', 'signal:+155****4567', 'matrix:!roomid:server.org', 'matrix:@user:server.org', 'ntfy:alerts-channel' (explicit ntfy topic), 'yuanbao:direct:<account_id>' (DM), 'yuanbao:group:<group_code>' (group chat)"
+                "description": "Delivery target. Format: 'platform' (uses home channel), 'platform:#channel-name', 'platform:chat_id', or 'platform:chat_id:thread_id' for Telegram topics and Discord threads. Examples: 'telegram', 'telegram:-1001234567890:17585', 'discord:999888777:555444333', 'discord:#bot-home', 'slack:#engineering', 'signal:+155****4567', 'matrix:!roomid:server.org', 'matrix:@user:server.org', 'ntfy:alerts-channel' (explicit ntfy topic)"
             },
             "message": {
                 "type": "string",
@@ -412,26 +409,7 @@ def _handle_send(args):
 
     pconfig = config.platforms.get(platform)
     if not pconfig or not pconfig.enabled:
-        # Weixin can be configured purely via .env; synthesize a pconfig so
-        # send_message and cron delivery work without a gateway.yaml entry.
-        if platform_name == "weixin":
-            wx_token = get_secret("WEIXIN_TOKEN", "").strip()
-            wx_account = get_secret("WEIXIN_ACCOUNT_ID", "").strip()
-            if wx_token and wx_account:
-                from gateway.config import PlatformConfig
-                pconfig = PlatformConfig(
-                    enabled=True,
-                    token=wx_token,
-                    extra={
-                        "account_id": wx_account,
-                        "base_url": get_secret("WEIXIN_BASE_URL", "").strip(),
-                        "cdn_base_url": get_secret("WEIXIN_CDN_BASE_URL", "").strip(),
-                    },
-                )
-            else:
-                return tool_error(f"Platform '{platform_name}' is not configured. Set up credentials in ~/.hermes/config.yaml or environment variables.")
-        else:
-            return tool_error(f"Platform '{platform_name}' is not configured. Set up credentials in ~/.hermes/config.yaml or environment variables.")
+        return tool_error(f"Platform '{platform_name}' is not configured. Set up credentials in ~/.hermes/config.yaml or environment variables.")
 
     from gateway.platforms.base import BasePlatformAdapter
 
@@ -448,11 +426,6 @@ def _handle_send(args):
     used_home_channel = False
     if not chat_id:
         home = config.get_home_channel(platform)
-        if not home and platform_name == "weixin":
-            wx_home = os.getenv("WEIXIN_HOME_CHANNEL", "").strip()
-            if wx_home:
-                from gateway.config import HomeChannel
-                home = HomeChannel(platform=platform, chat_id=wx_home, name="Weixin Home")
         if home:
             chat_id = home.chat_id
             used_home_channel = True
@@ -549,10 +522,6 @@ def _parse_target_ref(platform_name: str, target_ref: str):
         username = parse_telegram_username_target(target_ref)
         if username:
             return username, None, True
-    if platform_name == "feishu":
-        match = _FEISHU_TARGET_RE.fullmatch(target_ref)
-        if match:
-            return match.group(1), match.group(2), True
     if platform_name == "discord":
         match = _NUMERIC_TOPIC_RE.fullmatch(target_ref)
         if match:
@@ -575,17 +544,6 @@ def _parse_target_ref(platform_name: str, target_ref: str):
         split_idx = trimmed.rfind(":$")
         if split_idx > 0:
             return trimmed[:split_idx], trimmed[split_idx + 1 :], True
-    if platform_name == "weixin":
-        match = _WEIXIN_TARGET_RE.fullmatch(target_ref)
-        if match:
-            return match.group(1), None, True
-    if platform_name == "yuanbao":
-        match = _YUANBAO_TARGET_RE.fullmatch(target_ref)
-        if match:
-            return match.group(1), None, True
-        if target_ref.strip().isdigit():
-            return f"group:{target_ref.strip()}", None, True
-        return None, None, False
     if platform_name == "ntfy":
         topic = target_ref.strip()
         if topic:
@@ -608,14 +566,6 @@ def _parse_target_ref(platform_name: str, target_ref: str):
         if group_id:
             return f"group:{group_id}", None, True
         return None, None, False
-    # WeCom: group IDs start with "wr" or "wc", user IDs start with "wo" or
-    # are bare alphanumeric strings. Treat any non-empty WeCom target_ref as
-    # an explicit chat_id — the adapter resolves whether to use APP_CMD_RESPONSE
-    # (groups) or APP_CMD_SEND (DMs) internally.
-    if platform_name == "wecom":
-        stripped = target_ref.strip()
-        if stripped:
-            return stripped, None, True
     if platform_name in _PHONE_PLATFORMS:
         match = _E164_TARGET_RE.fullmatch(target_ref)
         if match:
@@ -1122,13 +1072,6 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
 
     media_files = media_files or []
 
-    # Weixin handles text/media delivery inside its native helper and does not
-    # need the optional platform adapter imports below. Keep this branch early
-    # so a Weixin send is not blocked by unrelated optional dependencies (for
-    # example lark-oapi's heavy Feishu import path).
-    if platform == Platform.WEIXIN:
-        return await _send_weixin(pconfig, chat_id, message, media_files=media_files)
-
     from gateway.platforms.base import BasePlatformAdapter, utf16_len
 
     # Telegram adapter import is optional (requires python-telegram-bot)
@@ -1289,189 +1232,13 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
             last_result = result
         return last_result
 
-    # --- Yuanbao: native media attachment support via running gateway adapter ---
-    if platform == Platform.YUANBAO and media_files:
-        last_result = None
-        for i, chunk in enumerate(chunks):
-            is_last = (i == len(chunks) - 1)
-            result = await _send_yuanbao(
-                chat_id,
-                chunk,
-                media_files=media_files if is_last else None,
-            )
-            if isinstance(result, dict) and result.get("error"):
-                return result
-            last_result = result
-        return last_result
-
-    # --- Feishu: native media attachment support via the registry's
-    # standalone_sender_fn (plugins/platforms/feishu/adapter.py::_standalone_send). #41112
-    if platform == Platform.FEISHU and media_files:
-        from gateway.platform_registry import platform_registry as _pr_feishu
-        from hermes_cli.plugins import discover_plugins as _dp_feishu
-        _dp_feishu()
-        _feishu_entry = _pr_feishu.get("feishu")
-        if _feishu_entry is None or _feishu_entry.standalone_sender_fn is None:
-            return {"error": "Feishu plugin not registered or missing standalone_sender_fn"}
-        last_result = None
-        for i, chunk in enumerate(chunks):
-            is_last = (i == len(chunks) - 1)
-            result = await _feishu_entry.standalone_sender_fn(
-                pconfig,
-                chat_id,
-                chunk,
-                media_files=media_files if is_last else None,
-                thread_id=thread_id,
-            )
-            if isinstance(result, dict) and result.get("error"):
-                return result
-            last_result = result
-        return last_result
-
-    # --- Slack: native media via files_upload_v2 in the plugin's
-    # standalone_sender_fn (plugins/platforms/slack/adapter.py::_standalone_send).
-    # Gateway in-channel MEDIA: delivery already worked; send_message previously
-    # omitted Slack attachments and told the model media was unsupported.
-    if platform == Platform.SLACK and media_files:
-        from gateway.platform_registry import platform_registry as _pr_slack
-        from hermes_cli.plugins import discover_plugins as _dp_slack
-        _dp_slack()
-        _slack_entry = _pr_slack.get("slack")
-        if _slack_entry is None or _slack_entry.standalone_sender_fn is None:
-            return {"error": "Slack plugin not registered or missing standalone_sender_fn"}
-        _sl_caption, _ = _media_caption_split(
-            message, media_files,
-            max_caption_len=(max_len or _DEFAULT_CAPTION_LIMIT),
-        )
-        if _sl_caption is not None:
-            result = await _slack_entry.standalone_sender_fn(
-                pconfig,
-                chat_id,
-                "",
-                thread_id=thread_id,
-                media_files=media_files,
-                caption=_sl_caption,
-            )
-            if isinstance(result, dict) and result.get("error"):
-                return result
-            return result
-        last_result = None
-        for i, chunk in enumerate(chunks):
-            is_last = (i == len(chunks) - 1)
-            result = await _slack_entry.standalone_sender_fn(
-                pconfig,
-                chat_id,
-                chunk,
-                thread_id=thread_id,
-                media_files=media_files if is_last else [],
-            )
-            if isinstance(result, dict) and result.get("error"):
-                return result
-            last_result = result
-        return last_result
-
-    # --- WhatsApp: native media attachment support via the registry's
-    # standalone_sender_fn (plugins/platforms/whatsapp/adapter.py::_standalone_send).
-    # The plugin uploads each file through the local Baileys bridge /send-media
-    # endpoint so images/videos/audio arrive as native bubbles, not documents. #41112
-    if platform == Platform.WHATSAPP and media_files:
-        from gateway.platform_registry import platform_registry as _pr_wa
-        from hermes_cli.plugins import discover_plugins as _dp_wa
-        _dp_wa()
-        _wa_entry = _pr_wa.get("whatsapp")
-        if _wa_entry is None or _wa_entry.standalone_sender_fn is None:
-            return {"error": "WhatsApp plugin not registered or missing standalone_sender_fn"}
-        # MEDIA:<path> caption: a single captionable file + short text rides
-        # as the media's native caption instead of a separate message before
-        # the bubble (single enforced decision in _media_caption_split). Cap on
-        # the platform's own message limit so the caption is always deliverable.
-        _wa_caption, _ = _media_caption_split(
-            message, media_files,
-            max_caption_len=(max_len or _DEFAULT_CAPTION_LIMIT),
-        )
-        last_result = None
-        if _wa_caption is not None:
-            # Single-file captioned send: no separate text chunk, caption on
-            # the media itself.
-            result = await _wa_entry.standalone_sender_fn(
-                pconfig,
-                chat_id,
-                "",
-                media_files=media_files,
-                thread_id=thread_id,
-                force_document=force_document,
-                caption=_wa_caption,
-            )
-            if isinstance(result, dict) and result.get("error"):
-                return result
-            return result
-        for i, chunk in enumerate(chunks):
-            is_last = (i == len(chunks) - 1)
-            result = await _wa_entry.standalone_sender_fn(
-                pconfig,
-                chat_id,
-                chunk,
-                media_files=media_files if is_last else None,
-                thread_id=thread_id,
-                force_document=force_document,
-            )
-            if isinstance(result, dict) and result.get("error"):
-                return result
-            last_result = result
-        return last_result
-
-    # --- Slack: prefer the live gateway adapter, then the plugin's
-    # standalone sender.  The live adapter is multi-workspace aware (it maps
-    # channels to the workspace client that owns them) and honors adapter-side
-    # gates like ignored_channels; the standalone Web-API path may only have a
-    # comma-separated token list.  ``_send_via_adapter`` tries the in-process
-    # adapter first and falls back to the registry standalone sender for
-    # out-of-process cron runs, preserving MEDIA delivery on the fallback
-    # (media-bearing sends were already intercepted by the branch above).
-    if platform == Platform.SLACK:
-        last_result = None
-        for i, chunk in enumerate(chunks):
-            is_last = i == len(chunks) - 1
-            result = await _send_via_adapter(
-                platform,
-                pconfig,
-                chat_id,
-                chunk,
-                thread_id=thread_id,
-                media_files=media_files if is_last else [],
-                force_document=force_document,
-            )
-            if isinstance(result, dict) and result.get("error"):
-                return result
-            last_result = result
-        return last_result
-
-    # --- WeCom: native media attachment support via live gateway adapter ---
-    if platform == Platform.WECOM and media_files:
-        last_result = None
-        for i, chunk in enumerate(chunks):
-            is_last = (i == len(chunks) - 1)
-            result = await _send_via_adapter(
-                platform,
-                pconfig,
-                chat_id,
-                chunk,
-                thread_id=thread_id,
-                media_files=media_files if is_last else None,
-                force_document=force_document,
-            )
-            if isinstance(result, dict) and result.get("error"):
-                return result
-            last_result = result
-        return last_result
-
     # --- Non-media platforms ---
     # Buzz is a plugin platform with verified native media delivery through
     # _send_via_adapter below, including valid media-only sends.
     if media_files and not message.strip() and platform.value != "buzz":
         return {
             "error": (
-                f"send_message MEDIA delivery is currently only supported for telegram, discord, matrix, weixin, signal, yuanbao, feishu, whatsapp and slack; "
+                f"send_message MEDIA delivery is currently only supported for telegram, discord, matrix, signal, whatsapp and slack; "
                 f"target {platform.value} had only media attachments"
             )
         }
@@ -1479,7 +1246,7 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
     if media_files and platform.value != "buzz":
         warning = (
             f"MEDIA attachments were omitted for {platform.value}; "
-            "native send_message media delivery is currently only supported for telegram, discord, matrix, weixin, signal, yuanbao, feishu, whatsapp and slack"
+            "native send_message media delivery is currently only supported for telegram, discord, matrix, signal, whatsapp and slack"
         )
 
     last_result = None
@@ -1492,18 +1259,8 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
             result = await _registry_standalone_send("email", pconfig, chat_id, chunk, thread_id)
         elif platform == Platform.SMS:
             result = await _registry_standalone_send("sms", pconfig, chat_id, chunk, thread_id)
-        elif platform == Platform.DINGTALK:
-            result = await _registry_standalone_send("dingtalk", pconfig, chat_id, chunk, thread_id)
-        elif platform == Platform.FEISHU:
-            result = await _registry_standalone_send("feishu", pconfig, chat_id, chunk, thread_id)
-        elif platform == Platform.WECOM:
-            result = await _registry_standalone_send("wecom", pconfig, chat_id, chunk, thread_id)
         elif platform == Platform.BLUEBUBBLES:
             result = await _send_bluebubbles(pconfig.extra, chat_id, chunk)
-        elif platform == Platform.QQBOT:
-            result = await _send_qqbot(pconfig, chat_id, chunk)
-        elif platform == Platform.YUANBAO:
-            result = await _send_yuanbao(chat_id, chunk)
         else:
             from gateway.platform_registry import platform_registry
 
@@ -2290,33 +2047,8 @@ async def _matrix_send_core(adapter, chat_id, message, media_files, metadata):
     }
 
 
-# _send_dingtalk moved to plugins/platforms/dingtalk/adapter.py::_standalone_send,
+# Platform standalone senders live on their plugins' adapters,
 # wired via standalone_sender_fn and reached through _registry_standalone_send. #41112.
-
-
-# _send_wecom moved to plugins/platforms/wecom/adapter.py::_standalone_send,
-# wired via standalone_sender_fn and reached through _registry_standalone_send. #41112.
-
-
-async def _send_weixin(pconfig, chat_id, message, media_files=None):
-    """Send via Weixin iLink using the native adapter helper."""
-    try:
-        from gateway.platforms.weixin import check_weixin_requirements, send_weixin_direct
-        if not check_weixin_requirements():
-            return {"error": "Weixin requirements not met. Need aiohttp + cryptography."}
-    except ImportError:
-        return {"error": "Weixin adapter not available."}
-
-    try:
-        return await send_weixin_direct(
-            extra=pconfig.extra,
-            token=pconfig.token,
-            chat_id=chat_id,
-            message=message,
-            media_files=media_files,
-        )
-    except Exception as e:
-        return _error(f"Weixin send failed: {e}")
 
 
 async def _send_bluebubbles(extra, chat_id, message):
@@ -2346,10 +2078,6 @@ async def _send_bluebubbles(extra, chat_id, message):
         return _error(f"BlueBubbles send failed: {e}")
 
 
-# _send_feishu moved to plugins/platforms/feishu/adapter.py::_standalone_send,
-# wired via standalone_sender_fn and reached through _registry_standalone_send
-# (and the feishu media branch above). #41112.
-
 
 def _check_send_message():
     """Gate send_message on gateway running (always available on messaging platforms).
@@ -2377,123 +2105,3 @@ def _check_send_message():
         return False
 
 
-async def _send_qqbot(pconfig, chat_id, message):
-    """Send via QQBot using the REST API directly (no WebSocket needed).
-
-    Uses the QQ Bot Open Platform REST endpoints to get an access token
-    and post a message. Supports guild channels, C2C (private) chats,
-    and group chats by trying the appropriate endpoints.
-    """
-    try:
-        import httpx
-    except ImportError:
-        return _error("QQBot direct send requires httpx. Run: pip install httpx")
-
-    # Resolve credential fallbacks through the profile secret scope (with the
-    # plain-environ fallback for unscoped single-profile runs) so a multiplex
-    # profile's direct send never borrows another profile's QQ credentials.
-    from gateway.config import _getenv
-
-    extra = pconfig.extra or {}
-    appid = extra.get("app_id") or _getenv("QQ_APP_ID", "")
-    secret = (pconfig.token or extra.get("client_secret")
-              or _getenv("QQ_CLIENT_SECRET", ""))
-    if not appid or not secret:
-        return _error("QQBot: QQ_APP_ID / QQ_CLIENT_SECRET not configured.")
-
-    try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            # Step 1: Get access token
-            token_resp = await client.post(
-                "https://bots.qq.com/app/getAppAccessToken",
-                json={"appId": str(appid), "clientSecret": str(secret)},
-            )
-            if token_resp.status_code != 200:
-                return _error(f"QQBot token request failed: {token_resp.status_code}")
-            token_data = token_resp.json()
-            access_token = token_data.get("access_token")
-            if not access_token:
-                return _error("QQBot: no access_token in response")
-
-            # Step 2: Send message via REST
-            # QQ Bot API has separate endpoints for channels, C2C, and groups.
-            # We try them in order: channel first, then fallback to C2C.
-            headers = {
-                "Authorization": f"QQBot {access_token}",
-                "Content-Type": "application/json",
-            }
-            payload = {"content": message[:4000], "msg_type": 0}
-
-            # Try channel endpoint first (works for guild channels)
-            url = f"https://api.sgroup.qq.com/channels/{chat_id}/messages"
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code in {200, 201}:
-                data = resp.json()
-                return {"success": True, "platform": "qqbot", "chat_id": chat_id,
-                        "message_id": data.get("id")}
-
-            # If channel endpoint failed (likely "频道不存在"), try C2C endpoint
-            url_c2c = f"https://api.sgroup.qq.com/v2/users/{chat_id}/messages"
-            resp_c2c = await client.post(url_c2c, json=payload, headers=headers)
-            if resp_c2c.status_code in {200, 201}:
-                data = resp_c2c.json()
-                return {"success": True, "platform": "qqbot", "chat_id": chat_id,
-                        "message_id": data.get("id")}
-
-            # If C2C also failed, try group endpoint
-            url_group = f"https://api.sgroup.qq.com/v2/groups/{chat_id}/messages"
-            resp_group = await client.post(url_group, json=payload, headers=headers)
-            if resp_group.status_code in {200, 201}:
-                data = resp_group.json()
-                return {"success": True, "platform": "qqbot", "chat_id": chat_id,
-                        "message_id": data.get("id")}
-
-            # All endpoints failed — return the most informative error
-            return _error(f"QQBot send failed: channel={resp.status_code} c2c={resp_c2c.status_code} group={resp_group.status_code}")
-    except Exception as e:
-        return _error(f"QQBot send failed: {e}")
-
-
-async def _send_yuanbao(chat_id, message, media_files=None):
-    """Send via Yuanbao using the running gateway adapter's WebSocket connection.
-
-    Yuanbao uses a persistent WebSocket — unlike HTTP-based platforms, we
-    cannot create a throwaway client.  We obtain the running singleton from
-    the adapter module itself (``get_active_adapter``).
-
-    chat_id format:
-      - Group: "group:<group_code>"
-      - DM:    "direct:<account_id>" or just "<account_id>"
-    """
-    try:
-        from gateway.platforms.yuanbao import get_active_adapter, send_yuanbao_direct
-    except ImportError:
-        return _error("Yuanbao adapter module not available.")
-
-    adapter = get_active_adapter()
-    if adapter is None:
-        return _error(
-            "Yuanbao adapter is not running. "
-            "Start the gateway with yuanbao platform enabled first."
-        )
-
-    try:
-        return await send_yuanbao_direct(adapter, chat_id, message, media_files=media_files)
-    except Exception as e:
-        return _error(f"Yuanbao send failed: {e}")
-
-
-# --- Registry ---
-from tools.registry import tool_error
-
-# NOTE: ``send_message`` is intentionally NOT registered as an agent-callable
-# model tool. The agent should not decide on its own to fire off cross-platform
-# messages or reactions. The send engine in this module (``_send_to_platform``,
-# ``_send_via_adapter``, ``_parse_target_ref``, the per-platform ``_send_*``
-# helpers) remains the shared transport used by:
-#   - cron delivery (cron/scheduler.py)
-#   - the ``hermes send`` CLI command (hermes_cli/send_cmd.py)
-#   - the gateway kanban notifier (dashboard-toggled, outside agent control)
-#   - the standalone MCP server (mcp_serve.py), which is an opt-in surface
-# Those callers import the helpers directly; none of them need the registry
-# entry.

@@ -1,7 +1,7 @@
 ---
 sidebar_position: 4
 title: "Memory Providers"
-description: "External memory provider plugins — Honcho, OpenViking, Mem0, Hindsight, Holographic, RetainDB, ByteRover, Supermemory"
+description: "External memory provider plugins — Honcho, Mem0, Hindsight, Holographic, RetainDB, ByteRover, Supermemory"
 ---
 
 # Memory Providers
@@ -22,7 +22,7 @@ Or set manually in `~/.hermes/config.yaml`:
 
 ```yaml
 memory:
-  provider: openviking   # or honcho, mem0, hindsight, holographic, retaindb, byterover, supermemory
+  provider: honcho   # or mem0, hindsight, holographic, retaindb, byterover, supermemory
 ```
 
 ## How It Works
@@ -276,76 +276,6 @@ Off-gateway these keys do nothing. `hermes memory setup` only prompts for them w
 
 See the [config reference](https://github.com/NousResearch/hermes-agent/blob/main/plugins/memory/honcho/README.md) and [Honcho integration guide](https://docs.honcho.dev/v3/guides/integrations/hermes).
 
-
----
-
-### OpenViking
-
-Context database by Volcengine (ByteDance) with filesystem-style knowledge hierarchy, tiered retrieval, and automatic memory extraction into 6 categories.
-
-| | |
-|---|---|
-| **Best for** | Self-hosted knowledge management with structured browsing |
-| **Requires** | OpenViking initialized, validated, and running |
-| **Data storage** | Self-hosted (local or cloud) |
-| **Cost** | Free (open-source, AGPL-3.0) |
-
-**Tools (6):** `viking_search` (semantic search), `viking_read` (tiered: abstract/overview/full), `viking_browse` (filesystem navigation), `viking_remember` (store facts), `viking_forget` (delete a memory file by exact `viking://` URI), `viking_add_resource` (ingest URLs/docs)
-
-**Setup:**
-```bash
-# Prepare OpenViking first
-openviking-server init
-openviking-server doctor
-openviking-server
-
-# Then configure Hermes
-hermes memory setup    # select "openviking"
-# Or manually:
-hermes config set memory.provider openviking
-```
-
-`hermes memory setup` can reuse or copy connection values from
-`~/.openviking/ovcli.conf`. Manual setup uses the active profile's `.env` file;
-for the default profile that is `~/.hermes/.env`, and for named profiles use
-`~/.hermes/profiles/<profile>/.env`.
-
-```text
-OPENVIKING_ENDPOINT=http://127.0.0.1:1933
-# OPENVIKING_API_KEY=...
-# OPENVIKING_ACCOUNT=default
-# OPENVIKING_USER=default
-```
-
-OpenViking server settings live in `ov.conf` (`--config`,
-`OPENVIKING_CONFIG_FILE`, or `~/.openviking/ov.conf`). Client connection values
-live in `ovcli.conf` (`OPENVIKING_CLI_CONFIG_FILE` or
-`~/.openviking/ovcli.conf`).
-
-**Key features:**
-- Tiered context loading: L0 (~100 tokens) → L1 (~2k) → L2 (full)
-- Automatic memory extraction on session commit (profile, preferences, entities, events, cases, patterns)
-- `viking://` URI scheme for hierarchical knowledge browsing
-
-`OPENVIKING_ACCOUNT` and `OPENVIKING_USER` are used for local/trusted mode.
-Peer identity is optional. By default, Hermes sends no peer ID and writes
-explicit memories to `viking://user/<user>/memories/...`. Setup does not ask
-for a peer ID. For separate assistant context, set
-`memory.openviking.agent: work-assistant` in `config.yaml`.
-
-Existing non-empty peer settings keep their peer-scoped writes and recall.
-This includes `OPENVIKING_AGENT` and `actor_peer_id` or legacy `agent_id` in a
-linked OpenViking config. Existing memories are not moved or deleted.
-With no peer ID, default search covers user memory and existing peer memories
-under the same OpenViking user. Old peer memories remain searchable at their
-existing paths. Ranking and result limits determine which memories are returned.
-Set `memory.openviking.agent: hermes` to restore the old peer-scoped writes.
-Memories written at user scope before this change stay there and remain
-searchable. The setting changes future writes, not existing memory locations.
-
-Hermes sends `User-Agent: openviking-memory-hermes/<version>` on OpenViking
-requests. This standard harness identifier contains no per-user identifier and
-does not add a separate request.
 
 ---
 
@@ -675,7 +605,6 @@ hermes memory setup
 | Provider | Storage | Cost | Tools | Dependencies | Unique Feature |
 |----------|---------|------|-------|-------------|----------------|
 | **Honcho** | Cloud | Paid | 5 | `honcho-ai` | Dialectic user modeling + session-scoped context |
-| **OpenViking** | Self-hosted | Free | 6 | `openviking` + server | Filesystem hierarchy + tiered loading |
 | **Mem0** | Cloud/Self-hosted | Free/Paid | 4 | `mem0ai` | Server-side LLM extraction + self-hosted/OSS modes |
 | **Hindsight** | Cloud/Local | Free/Paid | 3 | `hindsight-client` | Knowledge graph + reflect synthesis |
 | **Holographic** | Local | Free | 2 | None | HRR algebra + trust scoring |
@@ -691,7 +620,7 @@ Each provider's data is isolated per [profile](/user-guide/profiles):
 - **Local storage providers** (Holographic, ByteRover) use `$HERMES_HOME/` paths which differ per profile
 - **Config file providers** (Honcho, Mem0, Hindsight, Supermemory) store config in `$HERMES_HOME/` so each profile has its own credentials
 - **Cloud providers** (RetainDB) auto-derive profile-scoped project names
-- **Env var providers** (OpenViking) are configured via each profile's `.env` file
+- **Env var providers** are configured via each profile's `.env` file
 
 ## Building a Memory Provider
 

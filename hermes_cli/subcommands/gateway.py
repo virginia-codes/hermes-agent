@@ -310,7 +310,7 @@ def build_gateway_parser(
     # =========================================================================
     # proxy command — local OpenAI-compatible proxy that attaches the user's
     # OAuth-authenticated provider credentials to outbound requests. Lets
-    # external apps (OpenViking, Karakeep, Open WebUI, ...) ride a logged-in
+    # external apps (Karakeep, Open WebUI, ...) ride a logged-in
     # subscription without copy-pasting static API keys.
     # =========================================================================
     proxy_parser = subparsers.add_parser(

@@ -14,7 +14,7 @@ Full reference: https://hermes-agent.nousresearch.com/docs/user-guide/configurat
 | `display` | `skin`, `interface` (cli/tui), `language`, `show_reasoning`, `show_cost`, `pet` |
 | `approvals` | `mode` (smart/manual/off), `timeout`, `cron_mode` |
 | `stt` | `enabled`, `provider` (local/groq/openai/mistral/elevenlabs/deepinfra) |
-| `tts` | `provider` (edge/elevenlabs/openai/minimax/mistral/neutts/gemini/piper/kittentts/deepinfra/xai) |
+| `tts` | `provider` (edge/elevenlabs/openai/mistral/neutts/gemini/piper/kittentts/deepinfra/xai) |
 | `memory` | `memory_enabled`, `user_profile_enabled`, `provider`, `write_approval` |
 | `security` | `redact_secrets`, `tirith_enabled`, `website_blocklist` |
 | `delegation` | `model`, `provider`, `max_concurrent_children`, `max_iterations` (50), `max_spawn_depth` |
@@ -54,7 +54,7 @@ Full enumeration: `TOOLSETS` dict in `toolsets.py` (`_HERMES_CORE_TOOLS` is the 
 | `kanban` | Multi-agent work-queue tools (gated to workers) |
 | `debugging` | Extra introspection tools (off by default) |
 | `safe` | Minimal low-risk toolset for locked-down sessions |
-| `spotify`, `homeassistant`, `discord`, `discord_admin`, `feishu_doc`, `feishu_drive`, `yuanbao` | Service integrations (gated on their credentials) |
+| `spotify`, `homeassistant`, `discord`, `discord_admin` | Service integrations (gated on their credentials) |
 
 Tool changes take effect on `/reset` (new session) — never mid-conversation, to preserve prompt caching.
 
@@ -81,7 +81,6 @@ Auto-detect priority: local faster-whisper (`pip install faster-whisper`) → Gr
 | Edge TTS (default) | None | Yes |
 | ElevenLabs | `ELEVENLABS_API_KEY` | Free tier |
 | OpenAI | `VOICE_TOOLS_OPENAI_KEY` | Paid |
-| MiniMax | `MINIMAX_API_KEY` | Paid |
 | Mistral | `MISTRAL_API_KEY` | Paid |
 | Gemini | `GOOGLE_API_KEY` | Free tier |
 | NeuTTS / Piper / KittenTTS (local) | None | Free |

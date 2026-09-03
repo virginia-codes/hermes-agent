@@ -614,15 +614,6 @@ const sidebars: SidebarsConfig = {
                     'user-guide/skills/optional/web-development/web-development-publish-site',
                   ],
                 },
-                {
-                  type: 'category',
-                  label: 'yuanbao',
-                  key: 'skills-optional-yuanbao',
-                  collapsed: true,
-                  items: [
-                    'user-guide/skills/optional/yuanbao/yuanbao-yuanbao',
-                  ],
-                },
               ],
             },
           ],
@@ -662,13 +653,6 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Chinese platforms',
           items: [
-            'user-guide/messaging/dingtalk',
-            'user-guide/messaging/feishu',
-            'user-guide/messaging/wecom',
-            'user-guide/messaging/wecom-callback',
-            'user-guide/messaging/weixin',
-            'user-guide/messaging/qqbot',
-            'user-guide/messaging/yuanbao',
           ],
         },
         {

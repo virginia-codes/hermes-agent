@@ -30,15 +30,9 @@ Bots need both a model provider and tool providers (TTS, web). A [Nous Portal](/
 | Home Assistant | — | — | — | — | — | — | — |
 | Mattermost | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ |
 | Matrix | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| DingTalk | — | ✅ | ✅ | — | ✅ | — | ✅ |
-| Feishu/Lark | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| WeCom | ✅ | ✅ | ✅ | — | — | — | — |
-| WeCom Callback | — | — | — | — | — | — | — |
-| Weixin | ✅ | ✅ | ✅ | — | — | ✅ | — |
 | BlueBubbles | — | ✅ | ✅ | — | ✅ | ✅ | — |
 | Photon (iMessage) | ✅ | ✅ | ✅ | — | ✅ | ✅ | — |
 | QQ | ✅ | ✅ | ✅ | — | — | ✅ | — |
-| Yuanbao | ✅ | ✅ | ✅ | — | — | ✅ | ✅ |
 | Microsoft Teams | — | ✅ | — | ✅ | — | ✅ | — |
 | LINE | — | ✅ | ✅ | — | — | ✅ | — |
 | ntfy | — | — | — | — | — | — | — |
@@ -642,14 +636,7 @@ Each platform has its own toolset:
 | Home Assistant | `hermes-homeassistant` | Full tools + HA device control (ha_list_entities, ha_get_state, ha_call_service, ha_list_services) |
 | Mattermost | `hermes-mattermost` | Full tools including terminal |
 | Matrix | `hermes-matrix` | Full tools including terminal |
-| DingTalk | `hermes-dingtalk` | Full tools including terminal |
-| Feishu/Lark | `hermes-feishu` | Full tools including terminal |
-| WeCom | `hermes-wecom` | Full tools including terminal |
-| WeCom Callback | `hermes-wecom-callback` | Full tools including terminal |
-| Weixin | `hermes-weixin` | Full tools including terminal |
 | BlueBubbles | `hermes-bluebubbles` | Full tools including terminal |
-| QQBot | `hermes-qqbot` | Full tools including terminal |
-| Yuanbao | `hermes-yuanbao` | Full tools including terminal |
 | Microsoft Teams | `hermes-teams` | Full tools including terminal |
 | API Server | `hermes-api-server` | Full tools (drops `clarify`, `text_to_speech` — programmatic access doesn't have an interactive user) |
 | Webhooks | `hermes-webhook` | Full tools including terminal |
@@ -683,7 +670,7 @@ no longer start the adapter:
 
 ```yaml title="~/.hermes/config.yaml"
 platforms:
-  weixin:
+  telegram:
     enabled: false   # wins over WEIXIN_TOKEN in .env
 ```
 
@@ -694,10 +681,10 @@ you relied on that, the gateway now logs one WARNING per affected platform at
 startup so it does not just go dark:
 
 ```
-Platform 'weixin' is explicitly disabled by platforms.weixin.enabled: false in config.yaml,
+Platform 'telegram' is explicitly disabled by platforms.telegram.enabled: false in config.yaml,
 so the credentials found in the environment (WEIXIN_TOKEN, WEIXIN_ACCOUNT_ID) will NOT start
 its adapter. Environment credentials no longer override an explicit disable. Remove the key
-or set platforms.weixin.enabled: true to turn it back on.
+or set platforms.telegram.enabled: true to turn it back on.
 ```
 
 Omitting the `enabled` key entirely keeps the env-only behaviour: credentials
@@ -834,15 +821,8 @@ Defaults to `false`. Only platforms whose adapter implements `delete_message` ho
 - [Home Assistant Integration](homeassistant.md)
 - [Mattermost Setup](mattermost.md)
 - [Matrix Setup](matrix.md)
-- [DingTalk Setup](dingtalk.md)
-- [Feishu/Lark Setup](feishu.md)
-- [WeCom Setup](wecom.md)
-- [WeCom Callback Setup](wecom-callback.md)
-- [Weixin Setup (WeChat)](weixin.md)
 - [BlueBubbles Setup (iMessage)](bluebubbles.md)
 - [Photon Setup (iMessage)](photon.md)
-- [QQBot Setup](qqbot.md)
-- [Yuanbao Setup](yuanbao.md)
 - [Microsoft Teams Setup](teams.md)
 - [Teams Meetings Pipeline](teams-meetings.md)
 - [Microsoft Graph Webhook Listener](msgraph-webhook.md)

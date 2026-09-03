@@ -6,7 +6,6 @@ Built-in TTS providers:
 - Edge TTS (default, free, no API key): Microsoft Edge neural voices
 - ElevenLabs (premium): High-quality voices, needs ELEVENLABS_API_KEY
 - OpenAI TTS: Good quality, needs OPENAI_API_KEY
-- MiniMax TTS: High-quality with voice cloning, needs the selected region's key
 - Mistral (Voxtral TTS): Multilingual, native Opus, needs MISTRAL_API_KEY
 - Google Gemini TTS: Controllable, 30 prebuilt voices, needs GEMINI_API_KEY
 - xAI TTS: Grok voices, uses xAI Grok OAuth credentials or XAI_API_KEY
@@ -224,10 +223,6 @@ DEFAULT_KITTENTTS_VOICE = "Jasper"
 DEFAULT_PIPER_VOICE = "en_US-lessac-medium"  # balanced size/quality
 DEFAULT_OPENAI_VOICE = "alloy"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_MINIMAX_MODEL = "speech-02-hd"
-DEFAULT_MINIMAX_VOICE_ID = "English_expressive_narrator"
-DEFAULT_MINIMAX_BASE_URL = "https://api.minimax.io/v1/t2a_v2"
-DEFAULT_MINIMAX_CN_BASE_URL = "https://api.minimaxi.com/v1/t2a_v2"
 DEFAULT_MISTRAL_TTS_MODEL = "voxtral-mini-tts-2603"
 DEFAULT_MISTRAL_TTS_VOICE_ID = "c69964a6-ab8b-4f8a-9465-ec0925096ec8"  # Paul - Neutral
 DEFAULT_XAI_VOICE_ID = "eve"
@@ -289,7 +284,7 @@ def _default_output_dir() -> str:
 
 # ---------------------------------------------------------------------------
 # Per-provider input-character limits (from official provider docs).
-# A single global cap was wrong: OpenAI is 4096, xAI is 15k, MiniMax is 10k,
+# A single global cap was wrong: OpenAI is 4096, xAI is 15k,
 # ElevenLabs is model-dependent (5k / 10k / 30k / 40k), Gemini has a 32k-token
 # context window.  Users can override any of these via
 # ``tts.<provider>.max_text_length`` in config.yaml.
@@ -298,7 +293,6 @@ PROVIDER_MAX_TEXT_LENGTH: Dict[str, int] = {
     "edge": 5000,         # edge-tts practical sync limit
     "openai": 4096,       # https://platform.openai.com/docs/guides/text-to-speech
     "xai": 15000,         # https://docs.x.ai/developers/model-capabilities/audio/text-to-speech
-    "minimax": 10000,     # https://platform.minimax.io/docs/api-reference/speech-t2a-http (sync)
     "mistral": 4000,      # conservative; no published per-request cap
     "gemini": 32000,      # Gemini TTS has a 32k-token context window; char cap is conservative
     "elevenlabs": 10000,  # fallback when model-aware lookup can't resolve (multilingual_v2)
@@ -684,88 +678,6 @@ def _get_provider(tts_config: Dict[str, Any]) -> str:
     return provider
 
 
-@dataclass(frozen=True)
-class _MiniMaxTTSRuntime:
-    """A region-bound MiniMax endpoint and credential.
-
-    The credential is excluded from ``repr`` so diagnostics cannot expose it
-    accidentally.
-    """
-
-    region: str
-    endpoint: str
-    credential_source: str
-    api_key: str = field(repr=False)
-
-
-def _resolve_minimax_tts_runtime(
-    tts_config: Dict[str, Any],
-) -> _MiniMaxTTSRuntime:
-    """Select MiniMax TTS region, endpoint, and credential atomically.
-
-    An explicit ``tts.minimax.region`` wins. Without one, the legacy global
-    credential wins when present; a China credential is selected only when it
-    is the sole configured MiniMax credential.
-    """
-    mm_config = tts_config.get("minimax", {})
-    if not isinstance(mm_config, dict):
-        mm_config = {}
-
-    credentials = {
-        "global": (
-            "MINIMAX_API_KEY",
-            str(_resolve_provider_key("MINIMAX_API_KEY", "minimax") or "").strip(),
-        ),
-        "cn": (
-            "MINIMAX_CN_API_KEY",
-            str(_resolve_provider_key("MINIMAX_CN_API_KEY", "minimax") or "").strip(),
-        ),
-    }
-    endpoints = {
-        "global": DEFAULT_MINIMAX_BASE_URL,
-        "cn": DEFAULT_MINIMAX_CN_BASE_URL,
-    }
-
-    configured_region = str(mm_config.get("region") or "").strip().lower()
-    if configured_region and configured_region not in endpoints:
-        raise ValueError("tts.minimax.region must be 'global' or 'cn'")
-
-    if configured_region:
-        region = configured_region
-    elif credentials["global"][1]:
-        region = "global"
-    elif credentials["cn"][1]:
-        region = "cn"
-    else:
-        region = "global"
-
-    credential_source, api_key = credentials[region]
-    if not api_key:
-        raise ValueError(
-            f"{credential_source} not set for MiniMax TTS region {region!r}"
-        )
-
-    endpoint = str(mm_config.get("base_url") or endpoints[region]).strip()
-    endpoint_host = (urlparse(endpoint).hostname or "").lower()
-    official_region_hosts = {
-        "global": frozenset({"api.minimax.io", "api.minimax.chat"}),
-        "cn": frozenset({"api.minimaxi.com"}),
-    }
-    other_region = "cn" if region == "global" else "global"
-    if endpoint_host in official_region_hosts[other_region]:
-        raise ValueError(
-            f"tts.minimax.base_url points to the {other_region!r} MiniMax endpoint "
-            f"but region is {region!r}"
-        )
-
-    return _MiniMaxTTSRuntime(
-        region=region,
-        endpoint=endpoint,
-        credential_source=credential_source,
-        api_key=api_key,
-    )
-
-
 # ===========================================================================
 # Custom command providers (type: command under tts.providers.<name>)
 # ===========================================================================
@@ -801,7 +713,6 @@ BUILTIN_TTS_PROVIDERS = frozenset({
     "edge",
     "elevenlabs",
     "openai",
-    "minimax",
     "xai",
     "mistral",
     "gemini",
@@ -2242,144 +2153,6 @@ def _generate_xai_tts(text: str, output_path: str, tts_config: Dict[str, Any]) -
 
 
 # ===========================================================================
-# Provider: MiniMax TTS
-# ===========================================================================
-def _generate_minimax_tts(text: str, output_path: str, tts_config: Dict[str, Any]) -> str:
-    """
-    Generate audio using MiniMax TTS API.
-
-    Supports two endpoints:
-    - v1/text_to_speech: simple payload, returns raw audio (Content-Type: audio/mpeg)
-    - v1/t2a_v2: nested voice_setting/audio_setting, returns JSON with hex-encoded audio
-
-    Args:
-        text: Text to convert (max 10,000 characters).
-        output_path: Where to save the audio file.
-        tts_config: TTS config dict.
-
-    Returns:
-        Path to the saved audio file.
-    """
-    import requests
-
-    runtime = _resolve_minimax_tts_runtime(tts_config)
-
-    mm_config = tts_config.get("minimax", {})
-    if not isinstance(mm_config, dict):
-        mm_config = {}
-    model = mm_config.get("model", DEFAULT_MINIMAX_MODEL)
-    voice_id = mm_config.get("voice_id", DEFAULT_MINIMAX_VOICE_ID)
-    base_url = runtime.endpoint
-    speed = mm_config.get("speed", 1.0)
-    vol = mm_config.get("vol", 1.0)
-    pitch = mm_config.get("pitch", 0)
-    emotion = mm_config.get("emotion", "neutral")
-    sample_rate = mm_config.get("sample_rate", 32000)
-    bitrate = mm_config.get("bitrate", 128000)
-
-    # MiniMax accounts scope TTS requests by GroupId.  When present, the docs
-    # show it as a ?GroupId=<id> query param on the t2a_v2 URL.  Accept it
-    # from config or from the MINIMAX_GROUP_ID env var; only attach when the
-    # URL doesn't already carry one.
-    group_id = (
-        str(mm_config.get("group_id") or "").strip()
-        or (get_env_value("MINIMAX_GROUP_ID") or "").strip()
-    )
-    if group_id and "GroupId=" not in base_url:
-        sep = "&" if "?" in base_url else "?"
-        base_url = f"{base_url}{sep}GroupId={group_id}"
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {runtime.api_key}",
-    }
-
-    # Detect endpoint from URL
-    is_t2a_v2 = "t2a_v2" in base_url
-
-    if is_t2a_v2:
-        # t2a_v2 endpoint: nested voice_setting/audio_setting structure
-        payload = {
-            "model": model,
-            "text": text,
-            "voice_setting": {
-                "voice_id": voice_id,
-                "speed": speed,
-                "vol": vol,
-                "pitch": pitch,
-                "emotion": emotion,
-            },
-            "audio_setting": {
-                "sample_rate": sample_rate,
-                "bitrate": bitrate,
-                "format": "mp3",
-                "channel": 1,
-            },
-        }
-    else:
-        # text_to_speech endpoint: flat payload
-        payload = {
-            "model": model,
-            "text": text,
-            "voice_id": voice_id,
-        }
-
-    response = requests.post(
-        base_url,
-        json=payload,
-        headers=headers,
-        timeout=60,
-        stream=True,
-    )
-
-    if is_t2a_v2:
-        # t2a_v2 returns JSON with hex-encoded audio
-        response.raise_for_status()
-        result = _read_tts_response_json(response, label="MiniMax TTS")
-        base_resp = result.get("base_resp", {})
-        status_code = base_resp.get("status_code", -1)
-
-        if status_code != 0:
-            status_msg = base_resp.get("status_msg", "unknown error")
-            raise RuntimeError(f"MiniMax TTS API error (code {status_code}): {status_msg}")
-
-        hex_audio = result.get("data", {}).get("audio", "")
-        if not hex_audio:
-            raise RuntimeError("MiniMax TTS returned empty audio data")
-
-        audio_bytes = bytes.fromhex(hex_audio)
-        with open(output_path, "wb") as f:
-            f.write(audio_bytes)
-        return output_path
-
-    else:
-        # text_to_speech returns raw audio directly
-        content_type = response.headers.get("Content-Type", "")
-
-        if "audio/" in content_type:
-            _write_tts_response_to_file(response, output_path, label="MiniMax TTS")
-            return output_path
-
-        # Fallback: try parsing as JSON
-        try:
-            raw_body = _read_tts_response_bytes(response, label="MiniMax TTS")
-            result = json.loads(raw_body.decode("utf-8")) if raw_body else {}
-            base_resp = result.get("base_resp", {})
-            status_code = base_resp.get("status_code", -1)
-            if status_code != 0:
-                status_msg = base_resp.get("status_msg", "unknown error")
-                raise RuntimeError(f"MiniMax TTS API error (code {status_code}): {status_msg}")
-        except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
-            response.raise_for_status()
-            raise RuntimeError(
-                f"MiniMax TTS returned unexpected Content-Type '{content_type}' "
-                f"({len(raw_body) if 'raw_body' in locals() else 0} bytes)"
-            )
-
-        raise RuntimeError("MiniMax TTS returned no audio data")
-
-
-# ===========================================================================
 # Provider: Mistral (Voxtral TTS)
 # ===========================================================================
 def _generate_mistral_tts(text: str, output_path: str, tts_config: Dict[str, Any]) -> str:
@@ -3592,10 +3365,6 @@ def _text_to_speech_single(
             logger.info("Generating speech with DeepInfra TTS...")
             _generate_deepinfra_tts(text, file_str, tts_config)
 
-        elif provider == "minimax":
-            logger.info("Generating speech with MiniMax TTS...")
-            _generate_minimax_tts(text, file_str, tts_config)
-
         elif provider == "xai":
             logger.info("Generating speech with xAI TTS...")
             _generate_xai_tts(text, file_str, tts_config)
@@ -3725,7 +3494,7 @@ def _text_to_speech_single(
                 voice_compatible = file_str.endswith(".ogg")
         elif (
             want_opus
-            and provider in {"edge", "neutts", "minimax", "xai", "kittentts", "piper"}
+            and provider in {"edge", "neutts", "xai", "kittentts", "piper"}
             and not file_str.endswith(".ogg")
         ):
             opus_path = _convert_to_opus(file_str)
@@ -3791,7 +3560,7 @@ def text_to_speech_tool(
     Args:
         text: The text to convert to speech. Provider-specific per-request
             character caps apply automatically (OpenAI 4096, xAI 15000,
-            MiniMax 10000, ElevenLabs 5k-40k depending on model); longer
+            ElevenLabs 5k-40k depending on model); longer
             input is split into ordered chunks without silent truncation.
         output_path: Optional custom save path.
         speed: Optional playback speed multiplier (0.25-4.0).
@@ -4022,12 +3791,6 @@ def check_tts_requirements() -> bool:
         if importlib.util.find_spec("openai") is None:
             return False
         return bool(_resolve_provider_key("DEEPINFRA_API_KEY", "deepinfra"))
-    if provider == "minimax":
-        try:
-            _resolve_minimax_tts_runtime(tts_config)
-        except ValueError:
-            return False
-        return True
     if provider == "xai":
         try:
             from tools.xai_http import resolve_xai_http_credentials
@@ -4748,15 +4511,6 @@ if __name__ == "__main__":
         f"{'set' if resolve_openai_audio_api_key() else 'not set (VOICE_TOOLS_OPENAI_KEY or OPENAI_API_KEY)'}"
     )
     config = _load_tts_config()
-    try:
-        minimax_runtime = _resolve_minimax_tts_runtime(config)
-        minimax_status = (
-            f"API key set ({minimax_runtime.region}, "
-            f"{minimax_runtime.credential_source})"
-        )
-    except ValueError as exc:
-        minimax_status = f"unavailable ({exc})"
-    print(f"  MiniMax:    {minimax_status}")
     print(f"  Piper:      {'installed' if _check_piper_available() else 'not installed (pip install piper-tts)'}")
     print(f"  ffmpeg:     {'✅ found' if _has_ffmpeg() else '❌ not found (needed for Telegram Opus)'}")
     print(f"\n  Output dir: {_default_output_dir()}")
@@ -4778,7 +4532,7 @@ TTS_SCHEMA = {
         "properties": {
             "text": {
                 "type": "string",
-                "description": "The text to convert to speech. Provider-specific per-request character caps apply automatically (OpenAI 4096, xAI 15000, MiniMax 10000, ElevenLabs 5k-40k depending on model); longer input is split into ordered chunks without silent truncation."
+                "description": "The text to convert to speech. Provider-specific per-request character caps apply automatically (OpenAI 4096, xAI 15000, ElevenLabs 5k-40k depending on model); longer input is split into ordered chunks without silent truncation."
             },
             "output_path": {
                 "type": "string",
@@ -4801,7 +4555,7 @@ TTS_SCHEMA = {
                 "type": "string",
                 "description": (
                     "Optional TTS provider override. Accepts built-in names "
-                    "(edge, openai, elevenlabs, minimax, xai, mistral, gemini, "
+                    "(edge, openai, elevenlabs, xai, mistral, gemini, "
                     "neutts, kittentts, piper), user-declared command provider "
                     "names from tts.providers.<name>, or plugin-registered names. "
                     "When omitted, the configured tts.provider from config.yaml is used."

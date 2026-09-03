@@ -23,7 +23,6 @@ from hermes_cli.auth import (
     ACTUAL_LOCAL_NOAUTH_PLACEHOLDER,
     AuthError,
     DEFAULT_CODEX_BASE_URL,
-    DEFAULT_QWEN_BASE_URL,
     DEFAULT_XAI_OAUTH_BASE_URL,
     PROVIDER_REGISTRY,
     _agent_key_is_usable,
@@ -33,7 +32,6 @@ from hermes_cli.auth import (
     resolve_nous_runtime_credentials,
     resolve_codex_runtime_credentials,
     resolve_xai_oauth_runtime_credentials,
-    resolve_qwen_runtime_credentials,
     resolve_api_key_provider_credentials,
     resolve_external_process_provider_credentials,
     has_usable_secret,
@@ -521,17 +519,6 @@ def _resolve_runtime_from_pool_entry(
     elif provider == "xai-oauth":
         api_mode = "codex_responses"
         base_url = base_url or DEFAULT_XAI_OAUTH_BASE_URL
-    elif provider == "qwen-oauth":
-        api_mode = "chat_completions"
-        base_url = base_url or DEFAULT_QWEN_BASE_URL
-    elif provider == "minimax-oauth":
-        # MiniMax OAuth tokens are valid only against the Anthropic Messages
-        # compatible endpoint. Do not honor stale model.api_mode values from a
-        # prior OpenAI-compatible provider, or the client will hit
-        # /chat/completions under /anthropic and receive a bare nginx 404.
-        api_mode = "anthropic_messages"
-        pconfig = PROVIDER_REGISTRY.get(provider)
-        base_url = base_url or (pconfig.inference_base_url if pconfig else "")
     elif provider == "anthropic":
         api_mode = "anthropic_messages"
         cfg_provider = str(model_cfg.get("provider") or "").strip().lower()
@@ -1896,11 +1883,7 @@ def _resolve_explicit_runtime(
 
         base_url = explicit_base_url
         if not base_url:
-            if provider in {"kimi-coding", "kimi-coding-cn"}:
-                creds = resolve_api_key_provider_credentials(provider)
-                base_url = creds.get("base_url", "").rstrip("/")
-            else:
-                base_url = env_url or pconfig.inference_base_url
+            base_url = env_url or pconfig.inference_base_url
 
         if provider == "actual":
             base_url = normalize_actual_base_url(base_url)
@@ -2331,38 +2314,6 @@ def resolve_runtime_provider(
                 raise
             logger.info("Auto-detected xAI OAuth provider but credentials failed; "
                         "falling through to next provider.")
-
-    if provider == "qwen-oauth":
-        try:
-            creds = resolve_qwen_runtime_credentials()
-            return {
-                "provider": "qwen-oauth",
-                "api_mode": "chat_completions",
-                "base_url": creds.get("base_url", "").rstrip("/"),
-                "api_key": creds.get("api_key", ""),
-                "source": creds.get("source", "qwen-cli"),
-                "expires_at_ms": creds.get("expires_at_ms"),
-                "requested_provider": requested_provider,
-            }
-        except AuthError:
-            if requested_provider != "auto":
-                raise
-            logger.info("Qwen OAuth credentials failed; "
-                        "falling through to next provider.")
-
-    if provider == "minimax-oauth":
-        pconfig = PROVIDER_REGISTRY.get(provider)
-        if pconfig and pconfig.auth_type == "oauth_minimax":
-            from hermes_cli.auth import resolve_minimax_oauth_runtime_credentials
-            creds = resolve_minimax_oauth_runtime_credentials()
-            return {
-                "provider": provider,
-                "api_mode": "anthropic_messages",
-                "base_url": creds["base_url"],
-                "api_key": creds["api_key"],
-                "source": creds.get("source", "oauth"),
-                "requested_provider": requested_provider,
-            }
 
     # External-process providers (an agent CLI driven over stdio, e.g. ACP).
     # Keyed on the registered provider's auth_type rather than on one name, so a
