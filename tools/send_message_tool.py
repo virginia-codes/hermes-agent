@@ -1232,6 +1232,125 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
             last_result = result
         return last_result
 
+    # --- Slack: native media via files_upload_v2 in the plugin's
+    # standalone_sender_fn (plugins/platforms/slack/adapter.py::_standalone_send).
+    # Gateway in-channel MEDIA: delivery already worked; send_message previously
+    # omitted Slack attachments and told the model media was unsupported.
+    if platform == Platform.SLACK and media_files:
+        from gateway.platform_registry import platform_registry as _pr_slack
+        from hermes_cli.plugins import discover_plugins as _dp_slack
+        _dp_slack()
+        _slack_entry = _pr_slack.get("slack")
+        if _slack_entry is None or _slack_entry.standalone_sender_fn is None:
+            return {"error": "Slack plugin not registered or missing standalone_sender_fn"}
+        _sl_caption, _ = _media_caption_split(
+            message, media_files,
+            max_caption_len=(max_len or _DEFAULT_CAPTION_LIMIT),
+        )
+        if _sl_caption is not None:
+            result = await _slack_entry.standalone_sender_fn(
+                pconfig,
+                chat_id,
+                "",
+                thread_id=thread_id,
+                media_files=media_files,
+                caption=_sl_caption,
+            )
+            if isinstance(result, dict) and result.get("error"):
+                return result
+            return result
+        last_result = None
+        for i, chunk in enumerate(chunks):
+            is_last = (i == len(chunks) - 1)
+            result = await _slack_entry.standalone_sender_fn(
+                pconfig,
+                chat_id,
+                chunk,
+                thread_id=thread_id,
+                media_files=media_files if is_last else [],
+            )
+            if isinstance(result, dict) and result.get("error"):
+                return result
+            last_result = result
+        return last_result
+
+    # --- WhatsApp: native media attachment support via the registry's
+    # standalone_sender_fn (plugins/platforms/whatsapp/adapter.py::_standalone_send).
+    # The plugin uploads each file through the local Baileys bridge /send-media
+    # endpoint so images/videos/audio arrive as native bubbles, not documents. #41112
+    if platform == Platform.WHATSAPP and media_files:
+        from gateway.platform_registry import platform_registry as _pr_wa
+        from hermes_cli.plugins import discover_plugins as _dp_wa
+        _dp_wa()
+        _wa_entry = _pr_wa.get("whatsapp")
+        if _wa_entry is None or _wa_entry.standalone_sender_fn is None:
+            return {"error": "WhatsApp plugin not registered or missing standalone_sender_fn"}
+        # MEDIA:<path> caption: a single captionable file + short text rides
+        # as the media's native caption instead of a separate message before
+        # the bubble (single enforced decision in _media_caption_split). Cap on
+        # the platform's own message limit so the caption is always deliverable.
+        _wa_caption, _ = _media_caption_split(
+            message, media_files,
+            max_caption_len=(max_len or _DEFAULT_CAPTION_LIMIT),
+        )
+        last_result = None
+        if _wa_caption is not None:
+            # Single-file captioned send: no separate text chunk, caption on
+            # the media itself.
+            result = await _wa_entry.standalone_sender_fn(
+                pconfig,
+                chat_id,
+                "",
+                media_files=media_files,
+                thread_id=thread_id,
+                force_document=force_document,
+                caption=_wa_caption,
+            )
+            if isinstance(result, dict) and result.get("error"):
+                return result
+            return result
+        for i, chunk in enumerate(chunks):
+            is_last = (i == len(chunks) - 1)
+            result = await _wa_entry.standalone_sender_fn(
+                pconfig,
+                chat_id,
+                chunk,
+                media_files=media_files if is_last else None,
+                thread_id=thread_id,
+                force_document=force_document,
+            )
+            if isinstance(result, dict) and result.get("error"):
+                return result
+            last_result = result
+        return last_result
+
+    # --- Slack: prefer the live gateway adapter, then the plugin's
+    # standalone sender.  The live adapter is multi-workspace aware (it maps
+    # channels to the workspace client that owns them) and honors adapter-side
+    # gates like ignored_channels; the standalone Web-API path may only have a
+    # comma-separated token list.  ``_send_via_adapter`` tries the in-process
+    # adapter first and falls back to the registry standalone sender for
+    # out-of-process cron runs, preserving MEDIA delivery on the fallback
+    # (media-bearing sends were already intercepted by the branch above).
+    if platform == Platform.SLACK:
+        last_result = None
+        for i, chunk in enumerate(chunks):
+            is_last = i == len(chunks) - 1
+            result = await _send_via_adapter(
+                platform,
+                pconfig,
+                chat_id,
+                chunk,
+                thread_id=thread_id,
+                media_files=media_files if is_last else [],
+                force_document=force_document,
+            )
+            if isinstance(result, dict) and result.get("error"):
+                return result
+            last_result = result
+        return last_result
+
+
     # --- Non-media platforms ---
     # Buzz is a plugin platform with verified native media delivery through
     # _send_via_adapter below, including valid media-only sends.
@@ -2105,3 +2224,19 @@ def _check_send_message():
         return False
 
 
+
+
+# --- Registry ---
+from tools.registry import tool_error
+
+# NOTE: ``send_message`` is intentionally NOT registered as an agent-callable
+# model tool. The agent should not decide on its own to fire off cross-platform
+# messages or reactions. The send engine in this module (``_send_to_platform``,
+# ``_send_via_adapter``, ``_parse_target_ref``, the per-platform ``_send_*``
+# helpers) remains the shared transport used by:
+#   - cron delivery (cron/scheduler.py)
+#   - the ``hermes send`` CLI command (hermes_cli/send_cmd.py)
+#   - the gateway kanban notifier (dashboard-toggled, outside agent control)
+#   - the standalone MCP server (mcp_serve.py), which is an opt-in surface
+# Those callers import the helpers directly; none of them need the registry
+# entry.

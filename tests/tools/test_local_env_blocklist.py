@@ -87,17 +87,20 @@ class TestProviderEnvBlocklist:
             assert var not in result_env, f"{var} leaked into subprocess env"
 
     def test_registry_derived_vars_are_stripped(self):
-        """Vars from the provider registry (ANTHROPIC_TOKEN, ZAI_API_KEY, etc.)
-        must also be blocked — not just the hand-written extras."""
+        """Vars from the provider registry (ANTHROPIC_TOKEN, XAI_API_KEY, etc.)
+        must also be blocked — not just the hand-written extras.
+
+        The list is drawn from *registered* providers: the removed PRC ones
+        (ZAI_API_KEY, KIMI_API_KEY, MINIMAX_API_KEY, DEEPSEEK_API_KEY, …) are
+        no longer derived, so asserting on them would test nothing.
+        """
         registry_vars = {
             "ANTHROPIC_TOKEN": "ant-tok",
-            "ZAI_API_KEY": "zai-key",
-            "Z_AI_API_KEY": "z-ai-key",
-            "GLM_API_KEY": "glm-key",
-            "KIMI_API_KEY": "kimi-key",
-            "MINIMAX_API_KEY": "mm-key",
-            "MINIMAX_CN_API_KEY": "mmcn-key",
-            "DEEPSEEK_API_KEY": "deepseek-key",
+            "XAI_API_KEY": "xai-key",
+            "UPSTAGE_API_KEY": "upstage-key",
+            "FIREWORKS_API_KEY": "fw-key",
+            "DEEPINFRA_API_KEY": "di-key",
+            "NOVITA_API_KEY": "novita-key",
             "NVIDIA_API_KEY": "nvidia-key",
         }
         result_env = _run_with_env(extra_os_env=registry_vars)

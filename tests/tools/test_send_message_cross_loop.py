@@ -25,7 +25,7 @@ class TestSendViaAdapterCrossLoopDispatch:
         from tools.send_message_tool import _send_via_adapter
 
         send_loop_id = {}
-        platform = Platform("wecom")
+        platform = Platform("mattermost")
 
         class FakeAdapter:
             async def send(self, *, chat_id, content, metadata=None):
@@ -56,7 +56,7 @@ class TestSendViaAdapterCrossLoopDispatch:
             result = await _send_via_adapter(
                 platform,
                 SimpleNamespace(extra={}),
-                "wr_group_123",
+                "mm_channel_123",
                 "hello from worker",
             )
 
@@ -75,7 +75,7 @@ class TestSendViaAdapterCrossLoopDispatch:
         from tools.send_message_tool import _send_via_adapter
 
         current_loop = asyncio.get_running_loop()
-        platform = Platform("wecom")
+        platform = Platform("mattermost")
         called_directly = {}
 
         class FakeAdapter:
@@ -94,7 +94,7 @@ class TestSendViaAdapterCrossLoopDispatch:
         result = await _send_via_adapter(
             platform,
             SimpleNamespace(extra={}),
-            "wr_group_456",
+            "mm_channel_456",
             "direct send",
         )
 
@@ -109,7 +109,7 @@ class TestSendViaAdapterCrossLoopDispatch:
 
         stopped_loop = asyncio.new_event_loop()
         stopped_loop.close()
-        platform = Platform("wecom")
+        platform = Platform("mattermost")
 
         class FakeAdapter:
             async def send(self, *, chat_id, content, metadata=None):
@@ -126,7 +126,7 @@ class TestSendViaAdapterCrossLoopDispatch:
         result = await _send_via_adapter(
             platform,
             SimpleNamespace(extra={}),
-            "wr_group_789",
+            "mm_channel_789",
             "should fail",
         )
 
@@ -141,7 +141,7 @@ class TestSendViaAdapterCrossLoopDispatch:
 
         send_completed = asyncio.Event()
         send_result_holder = {}
-        platform = Platform("wecom")
+        platform = Platform("mattermost")
 
         class FakeAdapter:
             async def send(self, *, chat_id, content, metadata=None):
@@ -177,7 +177,7 @@ class TestSendViaAdapterCrossLoopDispatch:
                 return await _send_via_adapter(
                     platform,
                     SimpleNamespace(extra={}),
-                    "wr_group_shield",
+                    "mm_channel_shield",
                     "shielded msg",
                 )
 
