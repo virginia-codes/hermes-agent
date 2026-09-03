@@ -8608,6 +8608,42 @@ def _custom_endpoint_id(raw: str, fallback: str = "custom") -> str:
     return slug or fallback
 
 
+def _blocked_base_url_domain(base_url: str) -> Optional[str]:
+    """Return the blocked PRC domain *base_url* resolves to, or None.
+
+    Imported lazily to match ``tools.url_safety._blocked_prc_domain`` and keep
+    the dashboard's cold-start import graph unchanged.
+    """
+    try:
+        from agent.blocked_endpoints import blocked_domain_for
+    except Exception:  # pragma: no cover - policy must not break the dashboard
+        return None
+    return blocked_domain_for(base_url or "")
+
+
+def _reject_blocked_base_url(base_url: str) -> None:
+    """400 on a base URL pointing at a removed PRC-operated service.
+
+    The dashboard and desktop app let a user type an arbitrary endpoint, which
+    is the same trust boundary as ``providers:`` in config.yaml — already
+    guarded in ``hermes_cli.providers.resolve_user_provider``. Without this the
+    UI could save and activate ``https://api.deepseek.com/v1`` even though
+    every bundled path to it was removed.
+    """
+    domain = _blocked_base_url_domain(base_url)
+    if domain is None:
+        return
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            f"{domain} is a service operated from the PRC; Hermes no longer "
+            f"integrates with these services. See "
+            f"docs/removed-prc-integrations.md. Set "
+            f"HERMES_ALLOW_PRC_ENDPOINTS=1 to override this policy."
+        ),
+    )
+
+
 def _models_from_custom_endpoint_entry(entry: Dict[str, Any]) -> List[str]:
     models: List[str] = []
     raw_models = entry.get("models")
@@ -8750,6 +8786,7 @@ def _write_custom_endpoint(cfg: Dict[str, Any], body: CustomEndpointUpdate) -> T
     parsed = urllib.parse.urlparse(base_url)
     if not parsed.scheme or not parsed.netloc:
         raise HTTPException(status_code=400, detail="base_url must include scheme and host")
+    _reject_blocked_base_url(base_url)
     if not model:
         raise HTTPException(status_code=400, detail="model required")
 
@@ -8956,6 +8993,20 @@ async def validate_custom_endpoint(body: CustomEndpointUpdate):
     if not base_url:
         return {"ok": False, "reachable": True, "message": "Enter an endpoint URL first.", "models": []}
 
+    # Refuse BEFORE the probe: this route sends the user's API key to the URL,
+    # so letting a blocked host through would leak the credential to it.
+    _blocked = _blocked_base_url_domain(base_url)
+    if _blocked:
+        return {
+            "ok": False,
+            "reachable": True,
+            "message": (
+                f"{_blocked} is a service operated from the PRC; Hermes no "
+                f"longer integrates with these services."
+            ),
+            "models": [],
+        }
+
     url = base_url + "/models"
     headers = {"Accept": "application/json"}
     if body.api_key and body.api_key.strip():
@@ -8997,6 +9048,19 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
     # ids the endpoint advertises (OpenAI ``/v1/models`` shape) so the GUI can
     # auto-pick a default without asking the user to type a model name.
     if key == "OPENAI_BASE_URL":
+        # Refuse BEFORE the probe: the request below carries the user's API
+        # key, so probing a blocked host would leak the credential to it.
+        _blocked = _blocked_base_url_domain(value)
+        if _blocked:
+            return {
+                "ok": False,
+                "reachable": True,
+                "message": (
+                    f"{_blocked} is a service operated from the PRC; Hermes no "
+                    f"longer integrates with these services."
+                ),
+                "models": [],
+            }
         url = value.rstrip("/") + "/models"
         # Send the optional API key so endpoints that require auth on
         # ``/v1/models`` (many hosted OpenAI-compatible servers) still enumerate

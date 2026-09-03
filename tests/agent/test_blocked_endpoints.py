@@ -110,3 +110,120 @@ def test_custom_provider_entry_pointing_at_blocked_host_is_ignored():
     allowed = resolve_user_provider("mine", {"mine": {"url": "https://api.openai.com/v1"}})
     assert allowed is not None
     assert allowed.base_url == "https://api.openai.com/v1"
+
+
+# ---------------------------------------------------------------------------
+# Surface coverage: a removed provider must not reappear in any user-facing list
+# ---------------------------------------------------------------------------
+#
+# Deleting plugins/model-providers/<name>/ unregisters a provider from the
+# plugin registry, but the setup wizard and `hermes model` picker render
+# hermes_cli.models.CANONICAL_PROVIDERS — a hand-maintained list that is NOT
+# derived from that registry. A removal that misses it leaves DeepSeek, Kimi,
+# GLM et al. offered on a blank-slate install even though nothing can serve
+# them. This test pins every list a user actually sees.
+
+_PRC_PROVIDER_SLUGS = frozenset({
+    "alibaba", "alibaba-cn", "alibaba-coding-plan", "alibaba-coding-plan-cn",
+    "alibaba-token-plan", "alibaba-token-plan-cn", "qwen-oauth",
+    "deepseek", "zai", "kimi-coding", "kimi-coding-cn", "stepfun",
+    "minimax", "minimax-cn", "minimax-oauth", "xiaomi",
+    "tencent-tokenhub", "tencent-tokenplan",
+})
+
+
+def test_picker_provider_list_has_no_prc_providers():
+    """CANONICAL_PROVIDERS drives `hermes model` and the setup wizard."""
+    from hermes_cli.models import CANONICAL_PROVIDERS
+
+    listed = {p.slug for p in CANONICAL_PROVIDERS}
+    assert not (listed & _PRC_PROVIDER_SLUGS), (
+        f"removed providers still offered in the picker: "
+        f"{sorted(listed & _PRC_PROVIDER_SLUGS)}"
+    )
+
+
+def test_provider_groups_have_no_prc_members():
+    """Grouped picker rows (Kimi, MiniMax, Qwen, Tencent) must be gone too."""
+    from hermes_cli.models import PROVIDER_GROUPS
+
+    members = {slug for _l, _d, slugs in PROVIDER_GROUPS.values() for slug in slugs}
+    assert not (members & _PRC_PROVIDER_SLUGS), (
+        f"removed providers still grouped in the picker: "
+        f"{sorted(members & _PRC_PROVIDER_SLUGS)}"
+    )
+
+
+def test_model_catalogs_and_aliases_have_no_prc_providers():
+    """A stale alias would resolve a user's `--provider glm` to a dead slug."""
+    from hermes_cli.models import _PROVIDER_ALIASES, _PROVIDER_MODELS
+
+    assert not (set(_PROVIDER_MODELS) & _PRC_PROVIDER_SLUGS)
+    assert not (set(_PROVIDER_ALIASES.values()) & _PRC_PROVIDER_SLUGS)
+
+
+def test_auth_registry_has_no_prc_providers():
+    """PROVIDER_REGISTRY backs `hermes auth add` and credential resolution."""
+    from hermes_cli.auth import PROVIDER_REGISTRY
+
+    assert not (set(PROVIDER_REGISTRY) & _PRC_PROVIDER_SLUGS)
+
+
+def test_plugin_registry_has_no_prc_providers():
+    """providers/ discovery — the plugins/model-providers/<name>/ dirs."""
+    import providers
+
+    assert not ({p.name for p in providers.list_providers()} & _PRC_PROVIDER_SLUGS)
+
+
+def test_gateway_platform_enum_has_no_prc_platforms():
+    """Platform members back the gateway, setup wizard, and dashboard cards."""
+    from gateway.config import Platform
+
+    prc_platforms = {"qqbot", "weixin", "yuanbao", "wecom", "wecom_callback",
+                     "feishu", "dingtalk"}
+    assert not ({p.value for p in Platform} & prc_platforms)
+
+
+# ---------------------------------------------------------------------------
+# The dashboard / desktop custom-endpoint API
+# ---------------------------------------------------------------------------
+#
+# The web UI lets a user type an arbitrary base URL, which is the same trust
+# boundary as `providers:` in config.yaml. Both the save path and the two
+# live-probe routes must refuse a blocked host — the probes especially, since
+# they send the user's API key to whatever URL was entered.
+
+
+def test_custom_endpoint_write_rejects_blocked_base_url():
+    from fastapi import HTTPException
+
+    from hermes_cli.web_server import _reject_blocked_base_url
+
+    with pytest.raises(HTTPException) as excinfo:
+        _reject_blocked_base_url("https://api.deepseek.com/v1")
+    assert excinfo.value.status_code == 400
+    assert "deepseek.com" in str(excinfo.value.detail)
+
+
+def test_custom_endpoint_write_allows_permitted_base_url():
+    from hermes_cli.web_server import _reject_blocked_base_url
+
+    assert _reject_blocked_base_url("https://api.openai.com/v1") is None
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        ("https://api.deepseek.com/v1", "deepseek.com"),
+        ("https://open.bigmodel.cn/api/paas/v4", "bigmodel.cn"),
+        ("https://api.openai.com/v1", None),
+        ("https://api.deepseek.com.attacker.test/v1", None),
+        ("", None),
+    ],
+)
+def test_dashboard_blocked_domain_helper(url, expected):
+    """Probe routes gate on this before sending the API key anywhere."""
+    from hermes_cli.web_server import _blocked_base_url_domain
+
+    assert _blocked_base_url_domain(url) == expected

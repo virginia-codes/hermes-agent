@@ -103,13 +103,15 @@ at it: `model.base_url`, the `custom` provider, `providers:` and
 fetching tools.
 
 `agent/blocked_endpoints.py` is the single place that refuses those hosts. It is
-enforced at three boundaries:
+enforced at these boundaries:
 
 | Boundary | Behavior |
 |---|---|
 | `tools/url_safety.py::is_safe_url` | Fetches to blocked hosts are refused, alongside the existing SSRF checks. |
 | `hermes_cli/auth.py::resolve_api_key_provider_credentials` | A `*_BASE_URL` override aimed at a blocked host raises `AuthError`. |
 | `hermes_cli/providers.py` | `providers:` / `custom_providers:` entries naming a blocked host are ignored with a warning. |
+| `hermes_cli/web_server.py::_reject_blocked_base_url` | The dashboard/desktop "custom endpoint" form returns HTTP 400 instead of saving. |
+| `hermes_cli/web_server.py` probe routes | `/api/providers/validate` and `/api/providers/custom-endpoints/validate` refuse **before** the probe — those routes send the user's API key to the URL, so probing a blocked host would leak the credential to it. |
 
 Matching is on the **hostname**, exact or as a parent domain, via
 `utils.base_url_host_matches`. Substring matching on the raw URL is never used:
@@ -121,6 +123,22 @@ pins both directions, including lookalike hosts
 **Escape hatch.** Setting `HERMES_ALLOW_PRC_ENDPOINTS=1` disables enforcement.
 It exists so an operator in a different jurisdiction can re-enable these
 services deliberately. It is off by default and never set by Hermes itself.
+
+## The picker list is a separate surface
+
+Worth knowing if you ever remove another provider: unregistering it is **not**
+enough to stop it being offered.
+
+`hermes_cli/models.py::CANONICAL_PROVIDERS` is a hand-maintained list, not
+derived from the plugin registry or `PROVIDER_REGISTRY`. It is what
+`hermes_cli/inventory.py::build_models_payload` renders, and the CLI picker,
+the web dashboard and the desktop app all read that payload. A provider deleted
+everywhere else still appeared on a blank-slate setup until it was removed from
+this list too — along with `PROVIDER_GROUPS`, `_PROVIDER_MODELS`,
+`_PROVIDER_ALIASES` (a stale alias would resolve `--provider glm` to a dead
+slug), `_MODELS_DEV_PREFERRED` and `_PROVIDER_RETIRED_ALIASES`.
+
+`tests/agent/test_blocked_endpoints.py` pins all of these.
 
 ## Deliberately kept
 
@@ -156,12 +174,26 @@ They are dead branches, not connection paths.
 
 ## Verifying
 
+Use `scripts/run_tests.sh`, not `pytest` directly — see `AGENTS.md`. It runs
+one subprocess per test file with bounded parallelism, which is both far faster
+and CI-equivalent.
+
 ```bash
-# The deny-list and its boundaries
-python -m pytest tests/agent/test_blocked_endpoints.py
+# The deny-list, every provider-list surface, and the dashboard API guard (~5s)
+scripts/run_tests.sh tests/agent/test_blocked_endpoints.py tests/providers -q
 
 # No removed provider is registered
 python -c "import providers; print(sorted(p.name for p in providers.list_providers()))"
+
+# No removed provider is OFFERED — this is the list the CLI picker, web
+# dashboard and desktop app all render, and it is NOT derived from the
+# registry above, so it has to be checked separately.
+python -c "from hermes_cli.models import CANONICAL_PROVIDERS as C; print([p.slug for p in C])"
+
+# The blank-slate payload the dashboard and desktop actually consume
+python -c "from hermes_cli.inventory import build_models_payload, load_picker_context; \
+print([r.get('provider') for r in build_models_payload(load_picker_context(), \
+include_unconfigured=True).get('providers', [])])"
 
 # No removed platform is in the gateway enum
 python -c "from gateway.config import Platform; print(sorted(p.value for p in Platform))"

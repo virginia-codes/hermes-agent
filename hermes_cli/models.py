@@ -381,18 +381,6 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "gemini-3.6-flash",
         "gemini-3.1-flash-lite-preview",
     ],
-    "zai": [
-        "glm-5.3",
-        "glm-5.3-flash",
-        "glm-5.2",
-        "glm-5.1",
-        "glm-5",
-        "glm-5v-turbo",
-        "glm-5-turbo",
-        "glm-4.7",
-        "glm-4.5",
-        "glm-4.5-flash",
-    ],
     "xai": _xai_curated_models(),
     "nvidia": [
         # NVIDIA flagship reasoning models
@@ -407,59 +395,6 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "moonshotai/kimi-k2.6",
         "minimaxai/minimax-m3",
     ],
-    "kimi-coding": [
-        "kimi-k3",
-        "kimi-k2.7-code",
-        "kimi-k2.6",
-        "kimi-k2.5",
-        "kimi-for-coding",
-        "kimi-for-coding-highspeed",
-        "kimi-k2-thinking",
-        "kimi-k2-thinking-turbo",
-        "kimi-k2-turbo-preview",
-        "kimi-k2-0905-preview",
-    ],
-    "kimi-coding-cn": [
-        "kimi-k3",
-        "kimi-k2.7-code",
-        "kimi-k2.7-code-highspeed",
-        "kimi-k2.6",
-        "kimi-k2.5",
-        "kimi-k2-thinking",
-        "kimi-k2-turbo-preview",
-        "kimi-k2-0905-preview",
-    ],
-    "stepfun": [
-        "step-3.5-flash",
-        "step-3.5-flash-2603",
-    ],
-    "moonshot": [
-        "kimi-k3",
-        "kimi-k2.6",
-        "kimi-k2.5",
-        "kimi-k2-thinking",
-        "kimi-k2-turbo-preview",
-        "kimi-k2-0905-preview",
-    ],
-    "minimax": [
-        "MiniMax-M3",
-        "MiniMax-M2.7",
-        "MiniMax-M2.5",
-        "MiniMax-M2.1",
-        "MiniMax-M2",
-    ],
-    "minimax-oauth": [
-        "MiniMax-M3",
-        "MiniMax-M2.7",
-        "MiniMax-M2.7-highspeed",
-    ],
-    "minimax-cn": [
-        "MiniMax-M3",
-        "MiniMax-M2.7",
-        "MiniMax-M2.5",
-        "MiniMax-M2.1",
-        "MiniMax-M2",
-    ],
     "anthropic": [
         "claude-fable-5",
         "claude-sonnet-5",
@@ -472,27 +407,6 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "claude-opus-4-20250514",
         "claude-sonnet-4-20250514",
         "claude-haiku-4-5-20251001",
-    ],
-    "deepseek": [
-        "deepseek-v4-pro",
-        "deepseek-v4-flash",
-    ],
-    "xiaomi": [
-        "mimo-v2.5-pro",
-        "mimo-v2.5",
-        "mimo-v2-pro",
-        "mimo-v2-omni",
-        "mimo-v2-flash",
-    ],
-    "tencent-tokenhub": [
-        "hy4-preview",
-        "hy3",
-        "hy3-preview",
-    ],
-    "tencent-tokenplan": [
-        "hy4-preview",
-        "hy3",
-        "hy3-preview",
     ],
     "arcee": [
         "trinity-large-thinking",
@@ -650,109 +564,17 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
     # Users with classic DashScope keys should override DASHSCOPE_BASE_URL
     # to https://dashscope-intl.aliyuncs.com/compatible-mode/v1 (OpenAI-compat)
     # or https://dashscope-intl.aliyuncs.com/apps/anthropic (Anthropic-compat).
-    "alibaba": [
-        # Qwen 千问系列 (DashScope / Qwen Cloud)
-        "qwen3.8-max",
-        "qwen3.7-max",
-        "qwen3.7-plus",
-        "qwen3.6-plus",
-        "qwen3.6-flash",
-        "kimi-k2.5",
-        "qwen3.5-plus",
-        "qwen3-coder-plus",
-        "qwen3-coder-next",
-        # Third-party models available on coding-intl / DashScope
-        "glm-5.2",
-        "glm-5",
-        "glm-4.7",
-        "deepseek-v4-pro",
-        "deepseek-v4-flash-0731",
-        "MiniMax-M2.5",
-    ],
     # Alibaba DashScope (China) — same platform as alibaba, domestic endpoint
     # (dashscope.aliyuncs.com); same catalog as the international tier.
-    "alibaba-cn": [
-        "qwen3.8-max",
-        "qwen3.7-max",
-        "qwen3.7-plus",
-        "qwen3.6-plus",
-        "qwen3.6-flash",
-        "kimi-k2.5",
-        "qwen3.5-plus",
-        "qwen3-coder-plus",
-        "qwen3-coder-next",
-        "glm-5.2",
-        "glm-5",
-        "glm-4.7",
-        "deepseek-v4-pro",
-        "deepseek-v4-flash-0731",
-        "MiniMax-M2.5",
-    ],
     # Alibaba Coding Plan — same platform as alibaba (DashScope coding-intl),
     # separate provider ID with its own base_url_env_var.
-    "alibaba-coding-plan": [
-        "qwen3.7-plus",
-        "qwen3.6-plus",
-        "qwen3.5-plus",
-        "qwen3-max-2026-01-23",
-        "qwen3-coder-plus",
-        "qwen3-coder-next",
-        "kimi-k2.5",
-        "glm-5",
-        "glm-4.7",
-        "MiniMax-M2.5",
-    ],
     # Alibaba Coding Plan (China) — domestic coding endpoint
     # (coding.dashscope.aliyuncs.com); same catalog as the international tier.
-    "alibaba-coding-plan-cn": [
-        "qwen3.7-plus",
-        "qwen3.6-plus",
-        "qwen3.5-plus",
-        "qwen3-max-2026-01-23",
-        "qwen3-coder-plus",
-        "qwen3-coder-next",
-        "kimi-k2.5",
-        "glm-5",
-        "glm-4.7",
-        "MiniMax-M2.5",
-    ],
     # Alibaba Token Plan (Personal Edition) — dedicated token-plan endpoint
     # (token-plan.ap-southeast-1.maas.aliyuncs.com), key tier `sk-sp-...`.
     # Catalog verified against a live Token Plan subscription (2026-08-03).
-    "alibaba-token-plan": [
-        "qwen3.8-max-preview",
-        "qwen3.7-max",
-        "qwen3.7-plus",
-        "qwen3.6-plus",
-        "qwen3.6-flash",
-        "deepseek-v4-pro",
-        "deepseek-v4-flash",
-        "deepseek-v3.2",
-        "kimi-k2.7-code",
-        "kimi-k2.6",
-        "kimi-k2.5",
-        "glm-5.2",
-        "glm-5.1",
-        "glm-5",
-    ],
     # Alibaba Token Plan (China) — domestic token-plan endpoint
     # (token-plan.cn-beijing.maas.aliyuncs.com); same catalog as intl.
-    "alibaba-token-plan-cn": [
-        "qwen3.8-max-preview",
-        "qwen3.7-max",
-        "qwen3.7-plus",
-        "qwen3.6-plus",
-        "qwen3.6-flash",
-        "deepseek-v4-pro",
-        "deepseek-v4-flash",
-        "deepseek-v3.2",
-        "kimi-k2.7-code",
-        "kimi-k2.6",
-        "kimi-k2.5",
-        "glm-5.2",
-        "glm-5.1",
-        "glm-5",
-    ],
     # Curated HF model list — only agentic models that map to OpenRouter defaults.
     "huggingface": [
         "moonshotai/Kimi-K2.5",
@@ -1350,26 +1172,14 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("anthropic",      "Anthropic",                "Anthropic (Claude models via API key or Claude Code)"),
     ProviderEntry("openai-codex",   "ChatGPT or Codex Subscription", "ChatGPT or Codex Subscription (Sign in with your ChatGPT account, uses Codex models)"),
     ProviderEntry("openai-api",     "OpenAI API",               "OpenAI API (api.openai.com, API key)"),
-    ProviderEntry("alibaba",        "Qwen Cloud",               "Qwen Cloud / DashScope (Qwen + multi-provider)"),
     ProviderEntry("xai-oauth",      "xAI Grok OAuth (SuperGrok / Premium+)", "xAI Grok OAuth (SuperGrok / Premium+ subscription)"),
-    ProviderEntry("xiaomi",         "Xiaomi MiMo",              "Xiaomi MiMo (MiMo-V2.5 and V2 models: pro, omni, flash)"),
-    ProviderEntry("tencent-tokenhub", "Tencent TokenHub",       "Tencent TokenHub (Hy4 preview via tokenhub.tencentmaas.com)"),
-    ProviderEntry("tencent-tokenplan", "Tencent TokenPlan",     "Tencent TokenPlan (Hy4 preview via api.lkeap.cloud.tencent.com, Anthropic Messages)"),
     ProviderEntry("nvidia",         "NVIDIA NIM",               "NVIDIA NIM (Nemotron models via build.nvidia.com or local NIM)"),
     ProviderEntry("copilot",        "GitHub Copilot",           "GitHub Copilot (Uses GITHUB_TOKEN or gh auth token)"),
     ProviderEntry("copilot-acp",    "GitHub Copilot ACP",       "GitHub Copilot ACP (Spawns copilot --acp --stdio)"),
     ProviderEntry("huggingface",    "Hugging Face",             "Hugging Face Inference Providers"),
     ProviderEntry("gemini",         "Google AI Studio",         "Google AI Studio (Native Gemini API)"),
     ProviderEntry("vertex",         "Google Vertex AI",         "Google Vertex AI (Gemini via GCP; OAuth2 service account or ADC, GCP billing/quotas)"),
-    ProviderEntry("deepseek",       "DeepSeek",                 "DeepSeek (V3, R1, coder, direct API)"),
     ProviderEntry("xai",            "xAI",                      "xAI Grok (Direct API)"),
-    ProviderEntry("zai",            "Z.AI / GLM",               "Z.AI / GLM (Zhipu direct API)"),
-    ProviderEntry("kimi-coding",    "Kimi / Kimi Coding Plan",  "Kimi Coding Plan (api.kimi.com & Moonshot API)"),
-    ProviderEntry("kimi-coding-cn", "Kimi / Moonshot (China)",  "Kimi / Moonshot China (Domestic direct API)"),
-    ProviderEntry("stepfun",        "StepFun Step Plan",       "StepFun Step Plan (Agent / coding models via Step Plan API)"),
-    ProviderEntry("minimax",        "MiniMax",                  "MiniMax (Global direct API)"),
-    ProviderEntry("minimax-oauth",  "MiniMax (OAuth)",          "MiniMax via OAuth browser login (Coding Plan, minimax.io)"),
-    ProviderEntry("minimax-cn",     "MiniMax (China)",          "MiniMax China (Domestic direct API)"),
     ProviderEntry("ollama-cloud",   "Ollama Cloud",             "Ollama Cloud (Cloud-hosted open models, ollama.com)"),
     ProviderEntry("arcee",          "Arcee AI",                 "Arcee AI (Trinity models, direct API)"),
     ProviderEntry("gmi",            "GMI Cloud",                "GMI Cloud (Multi-model direct API)"),
@@ -1379,7 +1189,6 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("bedrock",        "AWS Bedrock",              "AWS Bedrock (Claude, Nova, Llama, DeepSeek; IAM or API key)"),
     ProviderEntry("azure-foundry",  "Azure Foundry",            "Azure Foundry (OpenAI-style or Anthropic-style endpoint, your Azure AI deployment)"),
     ProviderEntry("ai-gateway",     "Vercel AI Gateway",        "Vercel AI Gateway (Multi-model aggregator)"),
-    ProviderEntry("qwen-oauth",     "Qwen OAuth (Portal)",      "Qwen OAuth (Reuses local Qwen CLI login)"),
 ]
 
 # Auto-extend CANONICAL_PROVIDERS with any provider registered in providers/
@@ -1429,15 +1238,11 @@ _PROVIDER_LABELS["custom"] = "Custom endpoint"  # special case: not a named prov
 # Member order is the order shown inside the group submenu.
 # ---------------------------------------------------------------------------
 PROVIDER_GROUPS: dict[str, tuple[str, str, list[str]]] = {
-    "kimi":     ("Kimi / Moonshot", "Coding Plan, Moonshot global & China endpoints", ["kimi-coding", "kimi-coding-cn"]),
-    "minimax":  ("MiniMax",         "Global, OAuth Coding Plan & China endpoints",     ["minimax", "minimax-oauth", "minimax-cn"]),
     "xai":      ("xAI Grok",        "Direct API or SuperGrok / Premium+ OAuth",        ["xai", "xai-oauth"]),
     "google":   ("Google Gemini",   "Google AI Studio (API key)",                     ["gemini"]),
     "openai":   ("OpenAI",          "ChatGPT/Codex subscription or direct OpenAI API", ["openai-codex", "openai-api"]),
-    "qwen":     ("Qwen",            "Qwen Cloud / DashScope, Coding Plan, Token Plan & Qwen CLI OAuth", ["alibaba", "alibaba-cn", "alibaba-coding-plan", "alibaba-coding-plan-cn", "alibaba-token-plan", "alibaba-token-plan-cn", "qwen-oauth"]),
     "opencode": ("OpenCode",        "Zen pay-as-you-go, Go subscription, or free tier", ["opencode-zen", "opencode-go", "opencode-free"]),
     "copilot":  ("GitHub Copilot",  "GitHub token API or copilot --acp process",       ["copilot", "copilot-acp"]),
-    "tencent":  ("Tencent Hy",      "Hy4 / Hy3 via TokenHub & TokenPlan", ["tencent-tokenhub", "tencent-tokenplan"]),
 }
 
 # Reverse index: member slug -> group_id. Built once at import.
@@ -1512,10 +1317,6 @@ def group_providers(slugs):
 
 
 _PROVIDER_ALIASES = {
-    "glm": "zai",
-    "z-ai": "zai",
-    "z.ai": "zai",
-    "zhipu": "zai",
     "github": "copilot",
     "github-copilot": "copilot",
     "github-models": "copilot",
@@ -1529,12 +1330,6 @@ _PROVIDER_ALIASES = {
     "vertex-ai": "vertex",
     "gcp-vertex": "vertex",
     "vertexai": "vertex",
-    "kimi": "kimi-coding",
-    "moonshot": "kimi-coding",
-    "kimi-cn": "kimi-coding-cn",
-    "moonshot-cn": "kimi-coding-cn",
-    "step": "stepfun",
-    "stepfun-coding-plan": "stepfun",
     "arcee-ai": "arcee",
     "arceeai": "arcee",
     "gmi-cloud": "gmi",
@@ -1549,14 +1344,8 @@ _PROVIDER_ALIASES = {
     "nebius-tf": "nebius-token-factory",
     "token-factory": "nebius-token-factory",
     "tokenfactory": "nebius-token-factory",
-    "minimax-china": "minimax-cn",
-    "minimax_cn": "minimax-cn",
-    "minimax-portal": "minimax-oauth",
-    "minimax-global": "minimax-oauth",
-    "minimax_oauth": "minimax-oauth",
     "claude": "anthropic",
     "claude-code": "anthropic",
-    "deep-seek": "deepseek",
     "opencode": "opencode-zen",
     "zen": "opencode-zen",
     "go": "opencode-go",
@@ -1569,24 +1358,11 @@ _PROVIDER_ALIASES = {
     "kilo": "kilocode",
     "kilo-code": "kilocode",
     "kilo-gateway": "kilocode",
-    "dashscope": "alibaba",
-    "aliyun": "alibaba",
-    "qwen": "alibaba",
-    "alibaba-cloud": "alibaba",
-    "qwen-portal": "qwen-oauth",
     "hf": "huggingface",
     "hugging-face": "huggingface",
     "huggingface-hub": "huggingface",
     "novita-ai": "novita",
     "novitaai": "novita",
-    "mimo": "xiaomi",
-    "xiaomi-mimo": "xiaomi",
-    "tencent": "tencent-tokenhub",
-    "tokenhub": "tencent-tokenhub",
-    "tencent-cloud": "tencent-tokenhub",
-    "tencentmaas": "tencent-tokenhub",
-    "tokenplan": "tencent-tokenplan",
-    "tencent-lkeap": "tencent-tokenplan",
     "aws": "bedrock",
     "aws-bedrock": "bedrock",
     "amazon-bedrock": "bedrock",
@@ -3713,7 +3489,6 @@ def _provider_keys(provider: str) -> set[str]:
 # Retired model IDs kept for /model auto-detect only — not shown in pickers.
 # DeepSeek cut these off on 2026-07-24; model_normalize remaps them on the wire.
 _PROVIDER_RETIRED_ALIASES: dict[str, tuple[str, ...]] = {
-    "deepseek": ("deepseek-chat", "deepseek-reasoner"),
 }
 
 
@@ -4338,11 +4113,10 @@ def _resolve_copilot_catalog_api_key() -> str:
 #     truth for the subscription tier.
 # Also excluded: providers that already have dedicated live-endpoint
 # branches below (copilot, anthropic, ai-gateway, ollama-cloud, custom,
-# stepfun, openai-codex) — those paths handle freshness themselves.
+# openai-codex) — those paths handle freshness themselves.
 _MODELS_DEV_PREFERRED: frozenset[str] = frozenset({
     "opencode-go",
     "opencode-zen",
-    "deepseek",
     "kilocode",
     "fireworks",
     "mistral",
@@ -4352,7 +4126,6 @@ _MODELS_DEV_PREFERRED: frozenset[str] = frozenset({
     "groq",
     "nvidia",
     "huggingface",
-    "zai",
     "gemini",
     "google",
     "xai",
