@@ -43,11 +43,11 @@ async def test_teardown_bounds_hanging_cancel(bare_runner, monkeypatch, caplog):
 
     with caplog.at_level(logging.WARNING, logger="gateway.run"):
         await asyncio.wait_for(
-            bare_runner._bounded_adapter_teardown(adapter, Platform.FEISHU),
+            bare_runner._bounded_adapter_teardown(adapter, Platform.MATTERMOST),
             timeout=5.0,
         )
 
-    assert "feishu background-task cancel timed out" in caplog.text
+    assert "mattermost background-task cancel timed out" in caplog.text
     # disconnect still attempted after the cancel timeout — forward progress.
     adapter.disconnect.assert_awaited_once()
 
@@ -80,14 +80,14 @@ async def test_teardown_continues_after_cancellation_swallowing_background_cance
     adapter.cancel_background_tasks = AsyncMock(side_effect=swallow_cancellation)
     adapter.disconnect = AsyncMock(return_value=None)
     operation = asyncio.create_task(
-        bare_runner._bounded_adapter_teardown(adapter, Platform.FEISHU)
+        bare_runner._bounded_adapter_teardown(adapter, Platform.MATTERMOST)
     )
     await started.wait()
     done, _pending = await asyncio.wait({operation}, timeout=0.2)
     try:
         assert operation in done
         adapter.disconnect.assert_awaited_once()
-        assert "feishu background-task cancel timed out" in caplog.text
+        assert "mattermost background-task cancel timed out" in caplog.text
     finally:
         release.set()
         await asyncio.wait({operation}, timeout=0.2)

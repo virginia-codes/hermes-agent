@@ -76,7 +76,7 @@ def _make_runner():
 
 def _make_source() -> SessionSource:
     return SessionSource(
-        platform=Platform.FEISHU,
+        platform=Platform.MATTERMOST,
         chat_id="ou_test",
         chat_type="dm",
         user_id="user-1",

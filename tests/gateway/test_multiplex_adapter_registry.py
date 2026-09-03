@@ -42,7 +42,7 @@ class TestCredentialFingerprint:
         assert fp1 is not None
         assert "shared-project-secret" not in fp1
 
-    def test_reads_feishu_app_id(self):
+    def test_reads_app_id_credential_pair(self):
         """Feishu/Lark authenticates via app_id/app_secret, not a token.
 
         Without _app_id in the fingerprint attribute list, every Feishu
@@ -63,7 +63,7 @@ class TestCredentialFingerprint:
         assert fp1 == fp2  # same app -> same fingerprint -> conflict detected
         assert "cli_a1b2c3" not in fp1  # log-safe, never the raw credential
 
-    def test_distinct_feishu_app_ids_distinct_fp(self):
+    def test_distinct_app_ids_distinct_fp(self):
         class _FeishuAdapter:
             def __init__(self, app_id):
                 self._app_id = app_id
@@ -76,8 +76,8 @@ class TestCredentialFingerprint:
         assert fp_a != fp_b
 
     @pytest.mark.parametrize("attr", ["_client_id", "_bot_id"])
-    def test_reads_app_style_ids_teams_wecom(self, attr):
-        """Teams (_client_id) and WeCom (_bot_id) are the same class as Feishu:
+    def test_reads_app_style_ids(self, attr):
+        """Teams (_client_id) and bot-id adapters are the same class:
         id/secret pairs, no token — cloned profiles must collide."""
         a = types.SimpleNamespace(**{attr: "app-1"})
         b = types.SimpleNamespace(**{attr: "app-1"})
@@ -689,11 +689,8 @@ class TestSecondaryProfileConfigHandling:
 
         reviewer_cfg = GatewayConfig(multiplex_profiles=True)
         reviewer_cfg.platforms = {
-            # connection_mode=webhook: with #52563's conditional check merged,
-            # default (websocket) Feishu no longer binds a port — only webhook
-            # mode should be reported here.
-            Platform.FEISHU: PlatformConfig(
-                enabled=True, extra={"connection_mode": "webhook"}
+            Platform.MSGRAPH_WEBHOOK: PlatformConfig(
+                enabled=True, extra={"client_state": "s"}
             ),
             Platform.WEBHOOK: PlatformConfig(enabled=True, extra={"port": 8644}),
             Platform.TELEGRAM: PlatformConfig(enabled=True, token="t"),
@@ -705,7 +702,7 @@ class TestSecondaryProfileConfigHandling:
         with pytest.raises(SecondaryPortBindingConfigError) as ei:
             await runner._start_one_profile_adapters("reviewer", "/tmp/x", {})
         message = str(ei.value)
-        assert "feishu" in message
+        assert "msgraph_webhook" in message
         assert "webhook" in message
         assert "telegram" not in message
         assert "reviewer" not in runner._profile_adapters
@@ -1117,33 +1114,6 @@ class TestSecondaryProfileHookRegistration:
 
         assert ("shell", profile_cfg) in seen
         assert ("webhook", profile_cfg) in seen
-
-
-class TestFeishuPortBindingConditional:
-    """Feishu websocket mode does NOT bind a port; only webhook mode does (#52563)."""
-
-    @pytest.mark.asyncio
-    async def test_feishu_websocket_mode_not_rejected(self, monkeypatch):
-        """Feishu in websocket mode (the default) should NOT raise MultiplexConfigError."""
-        from gateway.run import MultiplexConfigError
-        from gateway.config import GatewayConfig, Platform, PlatformConfig
-
-        runner = GatewayRunner.__new__(GatewayRunner)
-        runner.config = GatewayConfig(multiplex_profiles=True)
-        runner._profile_adapters = {}
-
-        reviewer_cfg = GatewayConfig(multiplex_profiles=True)
-        reviewer_cfg.platforms = {
-            Platform.FEISHU: PlatformConfig(
-                enabled=True,
-                extra={"app_id": "cli_xxx", "app_secret": "sec", "connection_mode": "websocket"},
-            ),
-        }
-        monkeypatch.setattr("gateway.config.load_gateway_config", lambda: reviewer_cfg)
-        monkeypatch.setattr(runner, "_create_adapter", lambda p, c: None)
-
-        connected = await runner._start_one_profile_adapters("reviewer", "/tmp/x", {})
-        assert connected == 0  # no error, just nothing connected
 
 
 class TestSecondarySkipsCredentiallessPlatforms:
