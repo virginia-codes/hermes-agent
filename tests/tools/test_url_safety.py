@@ -145,17 +145,20 @@ class TestProxyEnvironmentDnsDelegation:
         with _resolves_to("198.18.0.23"):
             assert is_safe_url("https://example.com/file.jpg") is False
 
-    @pytest.mark.parametrize("url, expected", [
-        # the allowlisted host itself, over https
-        ("https://multimedia.nt.qq.com.cn/download?id=123", True),
-        # exception is an exact host match — subdomains stay blocked
-        ("https://sub.multimedia.nt.qq.com.cn/download?id=123", False),
-        # ... and requires https
-        ("http://multimedia.nt.qq.com.cn/download?id=123", False),
+    @pytest.mark.parametrize("url", [
+        "https://multimedia.nt.qq.com.cn/download?id=123",
+        "https://sub.multimedia.nt.qq.com.cn/download?id=123",
+        "http://multimedia.nt.qq.com.cn/download?id=123",
     ])
-    def test_qq_multimedia_hostname_exception(self, url, expected):
+    def test_qq_multimedia_hostname_no_longer_allowlisted(self, url):
+        """The one benchmark-IP exception used to be QQ's media host.
+
+        The QQ integration is gone and ``*.cn`` is on the PRC deny-list, which
+        rejects the host before the private-IP check is reached — so the
+        exception is dead and ``_TRUSTED_PRIVATE_IP_HOSTS`` is now empty.
+        """
         with _resolves_to("198.18.0.23"):
-            assert is_safe_url(url) is expected
+            assert is_safe_url(url) is False
 
 
 class TestAsyncIsSafeUrl:

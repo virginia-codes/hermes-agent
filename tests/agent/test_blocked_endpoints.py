@@ -227,3 +227,123 @@ def test_dashboard_blocked_domain_helper(url, expected):
     from hermes_cli.web_server import _blocked_base_url_domain
 
     assert _blocked_base_url_domain(url) == expected
+
+
+# ---------------------------------------------------------------------------
+# Tier 2: the general PRC web
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        # ccTLD, at every depth
+        "https://www.people.com.cn/news",
+        "https://baidu.cn",
+        "https://foo.gov.cn/page",
+        "https://zte.com.cn",
+        # Major PRC operators that do NOT use the ccTLD — a .cn-only rule
+        # would miss every one of these.
+        "https://www.baidu.com",
+        "https://taobao.com",
+        "https://www.tencent.com",
+        "https://bilibili.com",
+        "https://gitee.com/some/repo",
+        "https://www.huawei.com",
+        "https://shein.com",
+    ],
+)
+def test_prc_web_domains_are_blocked(url):
+    assert is_blocked_endpoint(url) is True
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://github.com",
+        "https://huggingface.co/models",
+        "https://en.wikipedia.org",
+        # Lookalikes: the rule is host-suffix, never substring.
+        "https://notcn.com",
+        "https://mycn.com",
+        "https://cnn.com",
+        "https://baidu.com.attacker.test",
+    ],
+)
+def test_non_prc_web_domains_are_not_blocked(url):
+    assert is_blocked_endpoint(url) is False
+
+
+def test_web_tier_has_its_own_opt_out(monkeypatch):
+    """An operator may bar PRC providers but still allow reading PRC sites."""
+    monkeypatch.setenv("HERMES_ALLOW_PRC_WEB", "1")
+
+    assert is_blocked_endpoint("https://www.people.com.cn") is False
+    # The provider tier is a different policy and stays on.
+    assert is_blocked_endpoint("https://api.deepseek.com/v1") is True
+
+
+def test_master_opt_out_disables_both_tiers(monkeypatch):
+    monkeypatch.setenv("HERMES_ALLOW_PRC_ENDPOINTS", "1")
+
+    assert is_blocked_endpoint("https://www.people.com.cn") is False
+    assert is_blocked_endpoint("https://api.deepseek.com/v1") is False
+
+
+def test_url_safety_blocks_prc_web():
+    from tools.url_safety import is_safe_url
+
+    assert is_safe_url("https://www.people.com.cn/news") is False
+    assert is_safe_url("https://github.com") is True
+
+
+# ---------------------------------------------------------------------------
+# The operator's own website_blocklist now reaches the generic URL guard
+# ---------------------------------------------------------------------------
+
+
+def _write_blocklist(tmp_path, monkeypatch, body):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    (tmp_path / "config.yaml").write_text(body, encoding="utf-8")
+    from tools.website_policy import invalidate_cache
+
+    invalidate_cache()
+
+
+def test_user_website_blocklist_is_enforced_by_is_safe_url(tmp_path, monkeypatch):
+    """Previously only web_tools/browser_tool consulted this list."""
+    from tools.url_safety import is_safe_url
+
+    _write_blocklist(
+        tmp_path,
+        monkeypatch,
+        "security:\n"
+        "  website_blocklist:\n"
+        "    enabled: true\n"
+        "    domains:\n"
+        "      - blocked.example\n",
+    )
+    try:
+        assert is_safe_url("https://blocked.example/page") is False
+        assert is_safe_url("https://allowed.example/page") is True
+    finally:
+        from tools.website_policy import invalidate_cache
+
+        invalidate_cache()
+
+
+def test_malformed_user_blocklist_fails_open(tmp_path, monkeypatch):
+    """A broken config must not take out all URL fetching."""
+    from tools.url_safety import is_safe_url
+
+    _write_blocklist(
+        tmp_path, monkeypatch, 'security:\n  website_blocklist: "not-a-mapping"\n'
+    )
+    try:
+        assert is_safe_url("https://github.com") is True
+        # ...but the built-in deny-list is unaffected by user config.
+        assert is_safe_url("https://api.deepseek.com/v1") is False
+    finally:
+        from tools.website_policy import invalidate_cache
+
+        invalidate_cache()

@@ -132,6 +132,65 @@ pins both directions, including lookalike hosts
 It exists so an operator in a different jurisdiction can re-enable these
 services deliberately. It is off by default and never set by Hermes itself.
 
+### The second tier: the general PRC web
+
+Blocking the service endpoints stops Hermes *connecting to* a PRC provider. It
+does not stop the agent *browsing to* a PRC site — `web_fetch`, the browser
+tools and image/vision fetches would happily load `https://www.people.com.cn`.
+`BLOCKED_WEB_DOMAINS` in the same module closes that, with two rules:
+
+- **`cn`** — the ccTLD. `base_url_host_matches` tests `host == rule or
+  host.endswith("." + rule)`, so one entry covers every `*.cn`, `*.com.cn`,
+  `*.gov.cn`, and does *not* match lookalikes like `notcn.com` or `cnn.com`.
+- **Named `.com` operators** — Alibaba, Tencent, ByteDance, Baidu, Huawei,
+  Xiaomi, JD, NetEase, Bilibili, Gitee and the rest. A ccTLD rule alone misses
+  every one of these, which is the trap this tier exists to avoid.
+
+`HERMES_ALLOW_PRC_WEB=1` re-enables **only** this tier, because the two
+policies differ in kind: an operator may reasonably bar the agent from PRC
+*inference providers* — where prompts and credentials go — while still letting
+it read a PRC news site for research. The master switch above disables both.
+
+**What this is not.** A deny-list cannot enumerate the PRC web, so this raises
+the floor rather than guaranteeing jurisdictional isolation. Two specific gaps:
+
+- **The terminal tool bypasses it.** A subprocess running `curl https://x.cn`
+  never reaches a Hermes HTTP client. Only a network-level control (egress
+  proxy, host firewall) covers that.
+- **TLD is a weak proxy for operator nationality**, in both directions — some
+  `.cn` domains are not PRC-operated, and PRC companies register `.com` freely.
+  The named-operator list mitigates the second direction, not the first.
+
+`tiktok.com` is included as ByteDance-operated. If you treat TikTok as a
+US/Singapore entity, delete that one entry — nothing else depends on it.
+
+One knock-on: `tools/url_safety.py` kept a single-entry SSRF exception,
+`_TRUSTED_PRIVATE_IP_HOSTS = {"multimedia.nt.qq.com.cn"}`, letting QQ media
+downloads resolve into benchmark space (`198.18.0.0/15`). The QQ integration is
+gone and `*.cn` is now denied earlier than that check runs, so the exception was
+dead code. The set is empty; the hook remains so a future host can be
+allowlisted without re-deriving the two call sites.
+
+### The operator's own blocklist
+
+`security.website_blocklist` in `~/.hermes/config.yaml` is a separate,
+user-managed list (`tools/website_policy.py`) that predates this work. It is
+now consulted by `is_safe_url` as well, so one entry covers every path the
+guard protects — previously it was honored only by `web_tools`, `browser_tool`,
+`vision_tools`, `image_source`, `skills_hub` and the Firecrawl provider.
+
+```yaml
+security:
+  website_blocklist:
+    enabled: true
+    domains: ["cn", "example.com"]
+    shared_files: ["/etc/hermes/blocklist.txt"]
+```
+
+It fails **open** on a malformed config — a broken YAML file must not take out
+all URL fetching — while the built-in deny-list above is unaffected by user
+config and keeps enforcing.
+
 ## The picker list is a separate surface
 
 Worth knowing if you ever remove another provider: unregistering it is **not**

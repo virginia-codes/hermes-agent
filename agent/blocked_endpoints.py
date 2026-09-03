@@ -96,7 +96,56 @@ BLOCKED_ENDPOINT_DOMAINS: tuple[str, ...] = (
     "modelscope.cn",
 )
 
+# ---------------------------------------------------------------------------
+# Tier 2: the general PRC web, not just AI-service endpoints
+# ---------------------------------------------------------------------------
+#
+# The list above stops Hermes CONNECTING to a PRC-operated model/messaging
+# service. It does not stop the agent BROWSING to a PRC site — `web_fetch`,
+# the browser tools and image/vision fetches would happily load
+# ``https://www.people.com.cn``. This tier closes that.
+#
+# Two rules, because neither alone is sufficient:
+#
+#   * ``cn`` matches the ccTLD. ``base_url_host_matches`` tests
+#     ``host == rule or host.endswith("." + rule)``, so a bare ``cn`` covers
+#     every ``*.cn``, ``*.com.cn``, ``*.gov.cn`` — and does NOT match
+#     lookalikes like ``notcn.com``.
+#   * The largest PRC companies serve from ``.com``, so a ccTLD rule alone
+#     misses Alibaba, Tencent, ByteDance, Baidu, Huawei et al. entirely.
+#     Those are named explicitly.
+#
+# This is a deny-list, so it is inherently incomplete — it cannot enumerate
+# the PRC web. It raises the floor; it is not a jurisdictional guarantee. The
+# terminal tool bypasses it entirely (a subprocess running ``curl`` never
+# reaches Hermes' HTTP clients); only a network-level control covers that.
+BLOCKED_WEB_DOMAINS: tuple[str, ...] = (
+    # The ccTLD itself.
+    "cn",
+    # Alibaba
+    "alibaba.com", "alibabagroup.com", "taobao.com", "tmall.com",
+    "aliexpress.com", "alipay.com", "1688.com", "cainiao.com",
+    # Tencent
+    "tencent.com", "wechat.com", "qcloud.com",
+    # ByteDance. NOTE: tiktok.com is deliberately included as ByteDance-
+    # operated; if you treat TikTok as a US/SG-operated entity, drop this
+    # one line — nothing else depends on it.
+    "bytedance.com", "douyin.com", "tiktok.com", "capcut.com",
+    # Baidu / Huawei / Xiaomi / JD / Meituan / PDD / NetEase / Sina / Sohu
+    "baidu.com", "huawei.com", "hicloud.com", "xiaomi.com", "mi.com",
+    "jd.com", "meituan.com", "pinduoduo.com", "temu.com",
+    "163.com", "126.com", "netease.com", "sina.com", "weibo.com",
+    "sohu.com", "ifeng.com",
+    # Media / community / commerce
+    "bilibili.com", "zhihu.com", "douban.com", "xiaohongshu.com",
+    "kuaishou.com", "iqiyi.com", "youku.com", "ctrip.com", "trip.com",
+    "shein.com", "lenovo.com", "zte.com.cn", "dji.com",
+    # Infrastructure / dev
+    "gitee.com", "csdn.net", "cnblogs.com", "oschina.net", "aliyuncs.com",
+)
+
 _ALLOW_ENV_VAR = "HERMES_ALLOW_PRC_ENDPOINTS"
+_ALLOW_WEB_ENV_VAR = "HERMES_ALLOW_PRC_WEB"
 
 
 class BlockedEndpointError(ValueError):
@@ -104,12 +153,32 @@ class BlockedEndpointError(ValueError):
 
 
 def enforcement_disabled() -> bool:
-    """Return True when the operator has opted out via env var."""
+    """Return True when the operator has opted out via env var.
+
+    This is the master switch: it disables BOTH tiers.
+    """
     return is_truthy_value(os.environ.get(_ALLOW_ENV_VAR), default=False)
+
+
+def web_enforcement_disabled() -> bool:
+    """Return True when general PRC web browsing is re-enabled.
+
+    Separate from :func:`enforcement_disabled` because the two policies are
+    different in kind: an operator may reasonably want the agent barred from
+    PRC *inference providers* (where prompts and credentials go) while still
+    letting it read a PRC news site for research. Setting the master switch
+    also disables this tier.
+    """
+    if enforcement_disabled():
+        return True
+    return is_truthy_value(os.environ.get(_ALLOW_WEB_ENV_VAR), default=False)
 
 
 def blocked_domain_for(url: str) -> str | None:
     """Return the blocked parent domain *url* resolves to, or ``None``.
+
+    Covers both tiers: the PRC-operated service endpoints and, unless
+    ``HERMES_ALLOW_PRC_WEB`` is set, the general PRC web.
 
     Returns ``None`` for empty URLs and for every host not on the list, so
     callers can use it as a plain predicate. Enforcement opt-out is honored
@@ -120,6 +189,10 @@ def blocked_domain_for(url: str) -> str | None:
     for domain in BLOCKED_ENDPOINT_DOMAINS:
         if base_url_host_matches(url, domain):
             return domain
+    if not web_enforcement_disabled():
+        for domain in BLOCKED_WEB_DOMAINS:
+            if base_url_host_matches(url, domain):
+                return domain
     return None
 
 
