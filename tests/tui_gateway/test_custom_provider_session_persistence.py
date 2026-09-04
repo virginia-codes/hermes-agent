@@ -2,13 +2,13 @@
 
 ``_runtime_model_config`` persists the live agent's RESOLVED provider into
 the session row's ``model_config`` JSON. For any named ``providers:`` /
-``custom_providers:`` entry (e.g. one called "mimo-v2.5-pro"),
+``custom_providers:`` entry (e.g. one called "relay-v1-pro"),
 ``agent.provider`` is the literal string "custom", so the entry name was
 lost — and the api_key is deliberately never persisted. On ``session.resume``
 or ``_reset_session_agent``, ``_stored_session_runtime_overrides`` fed
 provider="custom" back into ``_make_agent`` →
 ``resolve_runtime_provider(requested="custom")``, which cannot match an entry
-named "mimo-v2.5-pro". Depending on config the rebuild either raised
+named "relay-v1-pro". Depending on config the rebuild either raised
 "No LLM provider configured. Run `hermes model`..." (resume failed) or
 silently resolved placeholder credentials ("no-key-required") against the
 patched-back base_url.
@@ -30,15 +30,15 @@ from unittest.mock import MagicMock, patch
 import hermes_cli.runtime_provider as rp
 from hermes_state import SessionDB
 
-MIMO_URL = "https://token-plan-cn.xiaomimimo.com/v1"
-MIMO_KEY = "sk-mimo-entry-key"
+RELAY_URL = "https://token-plan.relay.example/v1"
+RELAY_KEY = "sk-relay-entry-key"
 
 LEGACY_LIST_CONFIG = {
     "custom_providers": [
         {
-            "name": "mimo-v2.5-pro",
-            "base_url": MIMO_URL,
-            "api_key": MIMO_KEY,
+            "name": "relay-v1-pro",
+            "base_url": RELAY_URL,
+            "api_key": RELAY_KEY,
             "api_mode": "chat_completions",
         }
     ]
@@ -46,17 +46,17 @@ LEGACY_LIST_CONFIG = {
 
 PROVIDERS_DICT_CONFIG = {
     "providers": {
-        "mimo-v2.5-pro": {
-            "api": MIMO_URL,
-            "api_key": MIMO_KEY,
+        "relay-v1-pro": {
+            "api": RELAY_URL,
+            "api_key": RELAY_KEY,
         }
     }
 }
 
 
-def _custom_agent(base_url=MIMO_URL):
+def _custom_agent(base_url=RELAY_URL):
     return types.SimpleNamespace(
-        model="mimo-v2.5-pro",
+        model="relay-v1-pro",
         provider="custom",
         base_url=base_url,
         api_mode="chat_completions",
@@ -73,8 +73,8 @@ class TestRuntimeModelConfigPersistsEntryIdentity:
 
         config = _runtime_model_config(_custom_agent())
 
-        assert config["provider"] == "custom:mimo-v2.5-pro"
-        assert config["base_url"] == MIMO_URL
+        assert config["provider"] == "custom:relay-v1-pro"
+        assert config["base_url"] == RELAY_URL
         # Credentials must keep coming from config/provider resolution,
         # never from the session DB.
         assert "api_key" not in config
@@ -142,34 +142,34 @@ class TestResumeRoundTrip:
 
         model_config = _runtime_model_config(_custom_agent())
         row = {
-            "model": "mimo-v2.5-pro",
+            "model": "relay-v1-pro",
             "model_config": json.dumps(model_config),
         }
         overrides = _stored_session_runtime_overrides(row)
-        assert overrides["model_override"]["provider"] == "custom:mimo-v2.5-pro"
+        assert overrides["model_override"]["provider"] == "custom:relay-v1-pro"
 
         kwargs = _make_agent_with_override(
             overrides["model_override"], monkeypatch, LEGACY_LIST_CONFIG
         )
 
         assert kwargs["provider"] == "custom"
-        assert kwargs["base_url"] == MIMO_URL
-        assert kwargs["api_key"] == MIMO_KEY
+        assert kwargs["base_url"] == RELAY_URL
+        assert kwargs["api_key"] == RELAY_KEY
 
     def test_legacy_row_with_bare_custom_heals_via_base_url(self, monkeypatch):
         """Rows persisted BEFORE the fix stored provider="custom"; the
         rebuild must recover the entry identity from the stored base_url."""
         override = {
-            "model": "mimo-v2.5-pro",
+            "model": "relay-v1-pro",
             "provider": "custom",
-            "base_url": MIMO_URL,
+            "base_url": RELAY_URL,
             "api_mode": "chat_completions",
         }
 
         kwargs = _make_agent_with_override(override, monkeypatch, LEGACY_LIST_CONFIG)
 
-        assert kwargs["base_url"] == MIMO_URL
-        assert kwargs["api_key"] == MIMO_KEY
+        assert kwargs["base_url"] == RELAY_URL
+        assert kwargs["api_key"] == RELAY_KEY
 
 
 # --- Regression: bare "custom" WITHOUT a base_url (GH #44022 / #47714) ------
@@ -184,12 +184,12 @@ class TestResumeRoundTrip:
 # config-fallback recovery at all three leak sites so it cannot regress again.
 
 NAMED_CONFIG = {
-    "model": {"default": "mimo-v2.5-pro", "provider": "custom:mimo-v2.5-pro"},
+    "model": {"default": "relay-v1-pro", "provider": "custom:relay-v1-pro"},
     "custom_providers": [
         {
-            "name": "mimo-v2.5-pro",
-            "base_url": MIMO_URL,
-            "api_key": MIMO_KEY,
+            "name": "relay-v1-pro",
+            "base_url": RELAY_URL,
+            "api_key": RELAY_KEY,
             "api_mode": "chat_completions",
         }
     ],
@@ -209,7 +209,7 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         # No base_url to reverse-lookup → must fall back to config.model.provider.
         assert (
             rp.canonical_custom_identity(base_url=None)
-            == "custom:mimo-v2.5-pro"
+            == "custom:relay-v1-pro"
         )
 
 
@@ -223,7 +223,7 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         config = _runtime_model_config(agent)
 
         # Bare "custom" must NOT be persisted — it heals to the entry identity.
-        assert config["provider"] == "custom:mimo-v2.5-pro"
+        assert config["provider"] == "custom:relay-v1-pro"
 
     def test_restore_heals_bare_custom_row_without_base_url(self, monkeypatch):
         monkeypatch.setattr(rp, "load_config", lambda: NAMED_CONFIG)
@@ -233,16 +233,16 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
 
         # A poisoned row from before the fix: bare custom, no base_url.
         row = {
-            "model": "mimo-v2.5-pro",
+            "model": "relay-v1-pro",
             "model_config": json.dumps(
-                {"model": "mimo-v2.5-pro", "provider": "custom"}
+                {"model": "relay-v1-pro", "provider": "custom"}
             ),
             "billing_provider": "custom",
         }
         overrides = _stored_session_runtime_overrides(row)
 
-        assert overrides["provider_override"] == "custom:mimo-v2.5-pro"
-        assert overrides["model_override"]["provider"] == "custom:mimo-v2.5-pro"
+        assert overrides["provider_override"] == "custom:relay-v1-pro"
+        assert overrides["model_override"]["provider"] == "custom:relay-v1-pro"
 
 
     def test_make_agent_heals_bare_custom_no_base_url_end_to_end(self, monkeypatch):
@@ -250,7 +250,7 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         base_url; _make_agent must build the AIAgent with the named entry's
         endpoint + key, NOT the OpenRouter default with an empty key."""
         override = {
-            "model": "mimo-v2.5-pro",
+            "model": "relay-v1-pro",
             "provider": "custom",
             "base_url": None,
             "api_mode": "chat_completions",
@@ -260,8 +260,8 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
             override, monkeypatch, NAMED_CONFIG, model_cfg=NAMED_CONFIG["model"]
         )
 
-        assert kwargs["base_url"] == MIMO_URL
-        assert kwargs["api_key"] == MIMO_KEY
+        assert kwargs["base_url"] == RELAY_URL
+        assert kwargs["api_key"] == RELAY_KEY
         assert "openrouter.ai" not in (kwargs.get("base_url") or "")
 
     def test_first_db_row_persists_entry_identity_not_bare_custom(self, monkeypatch):
@@ -282,17 +282,17 @@ class TestBareCustomNoBaseUrlHealsFromConfig:
         from tui_gateway import server as srv
 
         monkeypatch.setattr(srv, "_get_db", lambda: _DB())
-        monkeypatch.setattr(srv, "_resolve_model", lambda: "mimo-v2.5-pro")
+        monkeypatch.setattr(srv, "_resolve_model", lambda: "relay-v1-pro")
 
         session = {
             "session_key": "agent:main:desktop:dm:abc",
             # composer override carrying the lossy resolved provider + no base_url
-            "model_override": {"model": "mimo-v2.5-pro", "provider": "custom"},
+            "model_override": {"model": "relay-v1-pro", "provider": "custom"},
         }
         srv._ensure_session_db_row(session)
 
         persisted = captured.get("model_config") or {}
-        assert persisted.get("provider") == "custom:mimo-v2.5-pro"
+        assert persisted.get("provider") == "custom:relay-v1-pro"
 
 
 # --- Regression: bare "custom" + no base_url + DIFFERENT default provider ----
@@ -351,7 +351,7 @@ class TestStaleProviderNameFallsBack:
     resume falls back to the configured default (or the user's pick)."""
 
     def test_stale_bare_name_heals_via_model(self, monkeypatch):
-        """Registry serves mimo-v2.5-pro; the row still names the OLD slug —
+        """Registry serves relay-v1-pro; the row still names the OLD slug —
         the exact shape of the renamed-provider report (oldone -> newone)."""
         monkeypatch.setattr(rp, "load_config", lambda: NAMED_CONFIG)
         monkeypatch.setattr(rp, "_get_model_config", lambda: NAMED_CONFIG["model"])
@@ -359,16 +359,16 @@ class TestStaleProviderNameFallsBack:
         from tui_gateway.server import _stored_session_runtime_overrides
 
         row = {
-            "model": "mimo-v2.5-pro",
+            "model": "relay-v1-pro",
             "model_config": json.dumps(
-                {"model": "mimo-v2.5-pro", "provider": "stale-provider"}
+                {"model": "relay-v1-pro", "provider": "stale-provider"}
             ),
             "billing_provider": "custom",
         }
         overrides = _stored_session_runtime_overrides(row)
 
-        assert overrides["provider_override"] == "custom:mimo-v2.5-pro"
-        assert overrides["model_override"]["provider"] == "custom:mimo-v2.5-pro"
+        assert overrides["provider_override"] == "custom:relay-v1-pro"
+        assert overrides["model_override"]["provider"] == "custom:relay-v1-pro"
 
     def test_stale_prefixed_name_heals_and_drops_stale_base_url(self, monkeypatch):
         """Healing must also drop the snapshot's base_url so the registry URL
@@ -379,10 +379,10 @@ class TestStaleProviderNameFallsBack:
         from tui_gateway.server import _stored_session_runtime_overrides
 
         row = {
-            "model": "mimo-v2.5-pro",
+            "model": "relay-v1-pro",
             "model_config": json.dumps(
                 {
-                    "model": "mimo-v2.5-pro",
+                    "model": "relay-v1-pro",
                     "provider": "custom:stale-provider",
                     "base_url": "https://old.invalid/v1",
                     "api_mode": "chat_completions",
@@ -392,7 +392,7 @@ class TestStaleProviderNameFallsBack:
         }
         overrides = _stored_session_runtime_overrides(row)
 
-        assert overrides["provider_override"] == "custom:mimo-v2.5-pro"
+        assert overrides["provider_override"] == "custom:relay-v1-pro"
         assert overrides["model_override"]["base_url"] is None
 
     def test_unrecoverable_provider_drops_to_default(self, monkeypatch):
@@ -425,21 +425,21 @@ class TestStaleProviderNameFallsBack:
         from tui_gateway.server import _stored_session_runtime_overrides
 
         row = {
-            "model": "mimo-v2.5-pro",
+            "model": "relay-v1-pro",
             "model_config": json.dumps(
                 {
-                    "model": "mimo-v2.5-pro",
-                    "provider": "custom:mimo-v2.5-pro",
-                    "base_url": MIMO_URL,
+                    "model": "relay-v1-pro",
+                    "provider": "custom:relay-v1-pro",
+                    "base_url": RELAY_URL,
                     "api_mode": "chat_completions",
                 }
             ),
-            "billing_provider": "custom:mimo-v2.5-pro",
+            "billing_provider": "custom:relay-v1-pro",
         }
         overrides = _stored_session_runtime_overrides(row)
 
-        assert overrides["provider_override"] == "custom:mimo-v2.5-pro"
-        assert overrides["model_override"]["base_url"] == MIMO_URL
+        assert overrides["provider_override"] == "custom:relay-v1-pro"
+        assert overrides["model_override"]["base_url"] == RELAY_URL
 
 
 class TestOverridesHaveRoutableProvider:
@@ -451,7 +451,7 @@ class TestOverridesHaveRoutableProvider:
 
         assert (
             _overrides_have_routable_provider(
-                {"provider_override": "custom:mimo-v2.5-pro"}
+                {"provider_override": "custom:relay-v1-pro"}
             )
             is True
         )
