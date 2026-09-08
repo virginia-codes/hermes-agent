@@ -794,21 +794,11 @@ _PROVIDER_ALIASES = {
     "x-ai": "xai",
     "x.ai": "xai",
     "grok": "xai",
-    "glm": "zai",
-    "z-ai": "zai",
-    "z.ai": "zai",
-    "zhipu": "zai",
-    "kimi": "kimi-coding",
-    "moonshot": "kimi-coding",
-    "kimi-cn": "kimi-coding-cn",
-    "moonshot-cn": "kimi-coding-cn",
     "gmi-cloud": "gmi",
     "gmicloud": "gmi",
     "actual-computer": "actual",
     "actualcomputer": "actual",
     "aci": "actual",
-    "minimax-china": "minimax-cn",
-    "minimax_cn": "minimax-cn",
     "claude": "anthropic",
     "claude-code": "anthropic",
     "github": "copilot",
@@ -817,12 +807,6 @@ _PROVIDER_ALIASES = {
     "github-models": "copilot",
     "github-copilot-acp": "copilot-acp",
     "copilot-acp-agent": "copilot-acp",
-    "tencent": "tencent-tokenhub",
-    "tokenhub": "tencent-tokenhub",
-    "tencent-cloud": "tencent-tokenhub",
-    "tencentmaas": "tencent-tokenhub",
-    "tokenplan": "tencent-tokenplan",
-    "tencent-lkeap": "tencent-tokenplan",
 }
 
 
@@ -1234,10 +1218,6 @@ def _get_aux_model_for_provider(provider_id: str, *, prefer_fast: bool = False) 
 # profiles). New providers should set default_aux_model on their profile instead.
 _API_KEY_PROVIDER_AUX_MODELS_FALLBACK: Dict[str, str] = {
     "gemini": "gemini-3.6-flash",
-    "zai": "glm-4.5-flash",
-    "kimi-coding": "kimi-k2-turbo-preview",
-    "stepfun": "step-3.5-flash",
-    "kimi-coding-cn": "kimi-k2-turbo-preview",
     "gmi": "google/gemini-3.1-flash-lite-preview",
     "anthropic": "claude-haiku-4-5-20251001",
     "ai-gateway": "google/gemini-3-flash",
@@ -1245,8 +1225,6 @@ _API_KEY_PROVIDER_AUX_MODELS_FALLBACK: Dict[str, str] = {
     "opencode-go": "glm-5",
     "kilocode": "google/gemini-3.6-flash",
     "ollama-cloud": "nemotron-3-nano:30b",
-    "tencent-tokenhub": "hy4-preview",
-    "tencent-tokenplan": "hy4-preview",
     # NB: no "deepinfra" entry — its aux model lives on the ProviderProfile
     # (plugins/model-providers/deepinfra: default_aux_model), which
     # _get_aux_model_for_provider() reads first. Duplicating it here would be
@@ -1277,17 +1255,15 @@ def _task_prefers_fast_model(task: Optional[str]) -> bool:
 # differs from their main chat model, map it here.  The vision auto-detect
 # "exotic provider" branch checks this before falling back to the main model.
 _PROVIDER_VISION_MODELS: Dict[str, str] = {
-    "xiaomi": "mimo-v2.5",
-    "zai": "glm-5v-turbo",
 }
 
 
 def _resolve_provider_vision_default(provider: str) -> Optional[str]:
     """Return the provider's preferred default vision model id, or None.
 
-    Static entries in :data:`_PROVIDER_VISION_MODELS` win first (xiaomi /
-    zai have dedicated vision-only model names that don't live in any
-    discoverable catalog). Otherwise the provider's :class:`ProviderProfile`
+    Static entries in :data:`_PROVIDER_VISION_MODELS` win first (dedicated
+    vision-only model names that don't live in any discoverable catalog).
+    Otherwise the provider's :class:`ProviderProfile`
     gets a chance to supply one via its ``default_vision_model()`` hook —
     that's where catalog-backed providers (DeepInfra) resolve a live default,
     keeping the discovery logic inside their plugin instead of a name-check
@@ -1314,14 +1290,11 @@ def _resolve_provider_vision_default(provider: str) -> Optional[str]:
 # it must skip straight to the aggregator chain instead of returning a client
 # that will 404 on every vision request.
 #
-# kimi-coding / kimi-coding-cn: the Kimi Coding Plan routes through
-# api.kimi.com/coding (Anthropic Messages wire) which Kimi's own docs
-# describe as having no image_in capability. Vision lives on the separate
-# Kimi Platform (api.moonshot.ai, OpenAI-wire, pay-as-you-go).  See #17076.
-_PROVIDERS_WITHOUT_VISION: frozenset = frozenset({
-    "kimi-coding",
-    "kimi-coding-cn",
-})
+# Intentionally empty. Its members were kimi-coding / kimi-coding-cn (the Kimi
+# Coding Plan's /coding endpoint has no image_in capability, #17076); those
+# providers were removed, see docs/removed-prc-integrations.md. The set and its
+# branch below stay so a future no-vision endpoint needs one line here.
+_PROVIDERS_WITHOUT_VISION: frozenset = frozenset()
 
 # OpenRouter app attribution headers (base — always sent).
 # `X-Title` is the canonical attribution header OpenRouter's dashboard
@@ -4550,7 +4523,7 @@ _AUX_UNHEALTHY_LABEL_ALIASES = {
 def _normalize_chain_label(provider: str) -> str:
     """Normalize a resolved_provider value to a chain label used by
     ``_get_provider_chain()``. Falls back to the lowercased input for
-    direct API-key providers (deepseek, alibaba, minimax, etc.) which
+    direct API-key providers (xai, nvidia, gemini, etc.) which
     each report their own provider name from the api-key chain.
     """
     if not provider:
@@ -6817,7 +6790,7 @@ def resolve_provider_client(
     Args:
         provider: Provider identifier.  One of:
             "openrouter", "nous", "openai-codex" (or "codex"),
-            "zai", "kimi-coding", "minimax", "minimax-cn",
+            "anthropic", "gemini", "xai", "upstage",
             "custom" (OPENAI_BASE_URL + OPENAI_API_KEY),
             "auto" (full auto-detection chain).
         model: Model slug override.  If None, uses the provider's default
@@ -6840,8 +6813,8 @@ def resolve_provider_client(
     _validate_proxy_env_urls()
     # Preserve the original provider name before alias normalization so a
     # user-declared ``custom_providers`` entry whose name coincidentally
-    # matches a built-in alias (e.g. user names their custom provider "kimi"
-    # which aliases to "kimi-coding") is still reachable via the named-custom
+    # matches a built-in alias (e.g. user names their custom provider "solar"
+    # which aliases to "upstage") is still reachable via the named-custom
     # branch below.
     original_provider = (provider or "").strip().lower()
     # Normalise aliases

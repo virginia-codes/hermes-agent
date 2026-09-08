@@ -998,13 +998,11 @@ def test_credential_sources_registry_has_expected_steps():
     # assumes exist. When deliberately dropping one, update this list.
     required = {
         "gh auth token / COPILOT_GITHUB_TOKEN / GH_TOKEN",
-        "Any env-seeded credential (XAI_API_KEY, DEEPSEEK_API_KEY, etc.)",
+        "Any env-seeded credential (XAI_API_KEY, NVIDIA_API_KEY, etc.)",
         "~/.claude/.credentials.json",
         "~/.hermes/.anthropic_oauth.json",
         "auth.json providers.nous",
         "auth.json providers.openai-codex + ~/.codex/auth.json",
-        "auth.json providers.minimax-oauth",
-        "~/.qwen/oauth_creds.json",
         "Custom provider config.yaml api_key field",
     }
     missing = required - set(descriptions)
@@ -1079,25 +1077,25 @@ def test_auth_remove_env_seeded_dotenv_with_bom_no_shell_hint(tmp_path, monkeypa
     hermes_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
 
-    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.delenv("NVIDIA_API_KEY", raising=False)
     # BOM prefix (utf-8-sig) + the target var as the FIRST line.
     (hermes_home / ".env").write_bytes(
-        b"\xef\xbb\xbfDEEPSEEK_API_KEY=sk-ds-only\n"
+        b"\xef\xbb\xbfNVIDIA_API_KEY=nvapi-only\n"
     )
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-ds-only")
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvapi-only")
 
     _write_auth_store(
         tmp_path,
         {
             "version": 1,
             "credential_pool": {
-                "deepseek": [{
+                "nvidia": [{
                     "id": "env-1",
-                    "label": "DEEPSEEK_API_KEY",
+                    "label": "NVIDIA_API_KEY",
                     "auth_type": "api_key",
                     "priority": 0,
-                    "source": "env:DEEPSEEK_API_KEY",
-                    "access_token": "sk-ds-only",
+                    "source": "env:NVIDIA_API_KEY",
+                    "access_token": "nvapi-only",
                 }]
             },
         },
@@ -1105,8 +1103,8 @@ def test_auth_remove_env_seeded_dotenv_with_bom_no_shell_hint(tmp_path, monkeypa
 
     from types import SimpleNamespace
     from hermes_cli.auth_commands import auth_remove_command
-    auth_remove_command(SimpleNamespace(provider="deepseek", target="1"))
+    auth_remove_command(SimpleNamespace(provider="nvidia", target="1"))
 
     out = capsys.readouterr().out
-    assert "Cleared DEEPSEEK_API_KEY from .env" in out
+    assert "Cleared NVIDIA_API_KEY from .env" in out
     assert "still set in your shell environment" not in out

@@ -195,11 +195,12 @@ _ALWAYS_BLOCKED_NETWORKS = (
 )
 
 # Exact HTTPS hostnames allowed to resolve to private/benchmark-space IPs.
-# This is intentionally narrow: QQ media downloads can legitimately resolve
-# to 198.18.0.0/15 behind local proxy/benchmark infrastructure.
-_TRUSTED_PRIVATE_IP_HOSTS = frozenset({
-    "multimedia.nt.qq.com.cn",
-})
+# Intentionally empty. Its one member was ``multimedia.nt.qq.com.cn`` (QQ media
+# downloads, which legitimately resolve into 198.18.0.0/15 behind local proxy
+# infrastructure); the QQ integration is gone and that host is now on the PRC
+# deny-list, which rejects it earlier than this check runs. The hook stays so a
+# future host can be allowlisted without re-deriving the call sites.
+_TRUSTED_PRIVATE_IP_HOSTS: frozenset[str] = frozenset()
 
 _MAX_SSRF_CONNECT_IPS = 8
 
@@ -407,6 +408,47 @@ def is_always_blocked_url(url: str) -> bool:
         return False
 
 
+def _blocked_prc_domain(url: str) -> Optional[str]:
+    """Return the blocked PRC service domain for *url*, or None.
+
+    Imported lazily: ``agent.blocked_endpoints`` pulls in ``utils``, and
+    ``tools.url_safety`` is imported early enough in startup that a
+    module-level import would widen the cold-start import graph.
+    """
+    try:
+        from agent.blocked_endpoints import blocked_domain_for
+
+        return blocked_domain_for(url)
+    except Exception:  # pragma: no cover - policy must never break fetching
+        return None
+
+
+def _user_blocklist_rule(url: str) -> Optional[str]:
+    """Return the user's ``security.website_blocklist`` rule matching *url*.
+
+    The blocklist was previously consulted only by the browse/fetch tools
+    (``web_tools``, ``browser_tool``, ``vision_tools``, ``image_source``,
+    ``skills_hub``, the Firecrawl provider). Anything reaching the network
+    through another Hermes-owned client skipped it. Checking here means one
+    ``security.website_blocklist`` entry covers every path this guard
+    protects, matching the built-in deny-list's reach.
+
+    Lazily imported and fail-open for the same reason as the deny-list
+    above: a malformed user config must not take out all URL fetching. The
+    policy loader keeps its own TTL cache, so this stays cheap on the hot
+    path.
+    """
+    try:
+        from tools.website_policy import check_website_access
+
+        blocked = check_website_access(url)
+    except Exception:  # pragma: no cover - policy must never break fetching
+        return None
+    if not blocked:
+        return None
+    return str(blocked.get("rule") or "").strip() or "website_blocklist"
+
+
 def _allows_private_ip_resolution(hostname: str, scheme: str) -> bool:
     """Return True when a trusted HTTPS hostname may bypass IP-class blocking."""
     return scheme == "https" and hostname in _TRUSTED_PRIVATE_IP_HOSTS
@@ -436,6 +478,29 @@ def is_safe_url(url: str) -> bool:
         # Block known internal hostnames — ALWAYS, even with toggle on
         if hostname in _BLOCKED_HOSTNAMES:
             logger.warning("Blocked request to internal hostname: %s", hostname)
+            return False
+
+        # Block PRC-operated services Hermes no longer integrates with.
+        # Independent of the private-IP toggle: this is a policy block, not
+        # an SSRF one, and has its own HERMES_ALLOW_PRC_ENDPOINTS opt-out.
+        blocked_domain = _blocked_prc_domain(url)
+        if blocked_domain:
+            logger.warning(
+                "Blocked request to %s — PRC-operated service removed from Hermes "
+                "(see docs/removed-prc-integrations.md)",
+                blocked_domain,
+            )
+            return False
+
+        # The operator's own security.website_blocklist. Also independent of
+        # the private-IP toggle — it is an explicit policy choice, not SSRF.
+        user_rule = _user_blocklist_rule(url)
+        if user_rule:
+            logger.warning(
+                "Blocked request to %s — matched security.website_blocklist rule %r",
+                hostname,
+                user_rule,
+            )
             return False
 
         # Check the global toggle AFTER blocking metadata hostnames

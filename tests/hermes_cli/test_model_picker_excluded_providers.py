@@ -84,9 +84,23 @@ def test_cli_picker_hides_excluded_provider_by_alias(config_home):
     # Find a canonical provider that has at least one alias and is a leaf
     # row (not folded into a multi-member group) so its label appears
     # directly. Pick the first such provider.
+    from hermes_cli.models import PROVIDER_GROUPS
+
+    # A provider folded into a multi-member group renders as the GROUP's
+    # label, not its own, so excluding it does not remove a label from the
+    # list. Skip those — the assertion below matches on the provider label.
+    _grouped = {
+        slug
+        for _l, _d, members in PROVIDER_GROUPS.values()
+        if len(members) > 1
+        for slug in members
+    }
+
     target_slug = None
     target_alias = None
     for alias, canon in _PROVIDER_ALIASES.items():
+        if canon in _grouped:
+            continue
         if canon and any(p.slug == canon for p in CANONICAL_PROVIDERS):
             target_slug = canon
             target_alias = alias

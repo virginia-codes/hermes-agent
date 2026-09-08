@@ -107,14 +107,7 @@ _PLATFORM_ALLOWLIST_ENV = {
     "sms": "SMS_ALLOWED_USERS",
     "mattermost": "MATTERMOST_ALLOWED_USERS",
     "matrix": "MATRIX_ALLOWED_USERS",
-    "dingtalk": "DINGTALK_ALLOWED_USERS",
-    "feishu": "FEISHU_ALLOWED_USERS",
-    "wecom": "WECOM_ALLOWED_USERS",
-    "wecom_callback": "WECOM_CALLBACK_ALLOWED_USERS",
-    "weixin": "WEIXIN_ALLOWED_USERS",
     "bluebubbles": "BLUEBUBBLES_ALLOWED_USERS",
-    "qqbot": "QQ_ALLOWED_USERS",
-    "yuanbao": "YUANBAO_ALLOWED_USERS",
 }
 
 
@@ -374,7 +367,7 @@ def _merge_pairing_dir(active_dir: Path, alternate_dir: Path) -> None:
     Older installs use ``{HERMES_HOME}/pairing`` while newer code/docs may
     write ``{HERMES_HOME}/platforms/pairing``. If both directories exist, the
     gateway must not silently ignore approved users sitting in the inactive
-    location; otherwise already-paired Feishu users get asked for a fresh code.
+    location; otherwise already-paired users get asked for a fresh code.
     """
     if not alternate_dir.exists() or active_dir.resolve() == alternate_dir.resolve():
         return

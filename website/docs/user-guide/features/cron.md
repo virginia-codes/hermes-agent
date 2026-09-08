@@ -426,12 +426,7 @@ When scheduling jobs, you specify where the output goes:
 | `"email"` | Email | |
 | `"sms"` | SMS via Twilio | |
 | `"homeassistant"` | Home Assistant | |
-| `"dingtalk"` | DingTalk | |
-| `"feishu"` | Feishu/Lark | |
-| `"wecom"` | WeCom | |
-| `"weixin"` | Weixin (WeChat) | |
 | `"bluebubbles"` | BlueBubbles (iMessage) | |
-| `"qqbot"` | QQ Bot (Tencent QQ) | |
 | `"bot-chat"` | This profile's canonical Bot Chat — the bot reads the output and responds | Machine-local |
 | `"bot-chat:research"` | Another local profile's Bot Chat | Validated at create time |
 | `"all"` | Fan out to every connected home channel | Resolved at fire time |

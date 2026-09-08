@@ -92,9 +92,9 @@ class TestSupportsMediaInToolResults:
 
     def test_profile_tool_message_veto_overrides_supports_vision(self):
         """supports_vision_tool_messages=False is a hard veto even when the
-        profile declares supports_vision=True (xiaomi/MiMo 400s on list-type
+        profile declares supports_vision=True (meta-ai 400s on list-type
         tool-result content, #89981)."""
-        assert _supports_media_in_tool_results("xiaomi", "mimo-v2.5") is False
+        assert _supports_media_in_tool_results("meta-ai", "muse-spark-1.2") is False
 
     def test_profile_veto_applies_even_when_vision_capable_lookup_agrees(self):
         """A capability source marking the model vision-capable must not
@@ -103,7 +103,7 @@ class TestSupportsMediaInToolResults:
         from agent.auxiliary_client import set_runtime_main, clear_runtime_main
         from agent import image_routing
 
-        set_runtime_main("xiaomi", "mimo-v2.5")
+        set_runtime_main("meta-ai", "muse-spark-1.2")
         try:
             with patch.object(
                 image_routing, "decide_image_input_mode", return_value="native"

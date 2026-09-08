@@ -1374,7 +1374,7 @@ _SCHEMA_OVERRIDES: Dict[str, Dict[str, Any]] = {
     "tts.provider": {
         "type": "select",
         "description": "Text-to-speech provider",
-        "options": ["edge", "elevenlabs", "openai", "xai", "minimax", "mistral", "gemini", "neutts", "kittentts", "piper"],
+        "options": ["edge", "elevenlabs", "openai", "xai", "mistral", "gemini", "neutts", "kittentts", "piper"],
     },
     "stt.provider": {
         "type": "select",
@@ -3411,8 +3411,6 @@ _PORT_BINDING_PLATFORM_PORTS: Dict[str, Tuple[str, int]] = {
     "webhook": ("port", 8644),
     "api_server": ("port", 8642),
     "msgraph_webhook": ("port", 8646),
-    "feishu": ("webhook_port", 8765),
-    "wecom_callback": ("port", 8645),
     "bluebubbles": ("webhook_port", 8645),
     "sms": ("webhook_port", 8080),
     "whatsapp_cloud": ("webhook_port", 8090),
@@ -8610,6 +8608,42 @@ def _custom_endpoint_id(raw: str, fallback: str = "custom") -> str:
     return slug or fallback
 
 
+def _blocked_base_url_domain(base_url: str) -> Optional[str]:
+    """Return the blocked PRC domain *base_url* resolves to, or None.
+
+    Imported lazily to match ``tools.url_safety._blocked_prc_domain`` and keep
+    the dashboard's cold-start import graph unchanged.
+    """
+    try:
+        from agent.blocked_endpoints import blocked_domain_for
+    except Exception:  # pragma: no cover - policy must not break the dashboard
+        return None
+    return blocked_domain_for(base_url or "")
+
+
+def _reject_blocked_base_url(base_url: str) -> None:
+    """400 on a base URL pointing at a removed PRC-operated service.
+
+    The dashboard and desktop app let a user type an arbitrary endpoint, which
+    is the same trust boundary as ``providers:`` in config.yaml — already
+    guarded in ``hermes_cli.providers.resolve_user_provider``. Without this the
+    UI could save and activate ``https://api.deepseek.com/v1`` even though
+    every bundled path to it was removed.
+    """
+    domain = _blocked_base_url_domain(base_url)
+    if domain is None:
+        return
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            f"{domain} is a service operated from the PRC; Hermes no longer "
+            f"integrates with these services. See "
+            f"docs/removed-prc-integrations.md. Set "
+            f"HERMES_ALLOW_PRC_ENDPOINTS=1 to override this policy."
+        ),
+    )
+
+
 def _models_from_custom_endpoint_entry(entry: Dict[str, Any]) -> List[str]:
     models: List[str] = []
     raw_models = entry.get("models")
@@ -8752,6 +8786,7 @@ def _write_custom_endpoint(cfg: Dict[str, Any], body: CustomEndpointUpdate) -> T
     parsed = urllib.parse.urlparse(base_url)
     if not parsed.scheme or not parsed.netloc:
         raise HTTPException(status_code=400, detail="base_url must include scheme and host")
+    _reject_blocked_base_url(base_url)
     if not model:
         raise HTTPException(status_code=400, detail="model required")
 
@@ -8958,6 +8993,20 @@ async def validate_custom_endpoint(body: CustomEndpointUpdate):
     if not base_url:
         return {"ok": False, "reachable": True, "message": "Enter an endpoint URL first.", "models": []}
 
+    # Refuse BEFORE the probe: this route sends the user's API key to the URL,
+    # so letting a blocked host through would leak the credential to it.
+    _blocked = _blocked_base_url_domain(base_url)
+    if _blocked:
+        return {
+            "ok": False,
+            "reachable": True,
+            "message": (
+                f"{_blocked} is a service operated from the PRC; Hermes no "
+                f"longer integrates with these services."
+            ),
+            "models": [],
+        }
+
     url = base_url + "/models"
     headers = {"Accept": "application/json"}
     if body.api_key and body.api_key.strip():
@@ -8999,6 +9048,19 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
     # ids the endpoint advertises (OpenAI ``/v1/models`` shape) so the GUI can
     # auto-pick a default without asking the user to type a model name.
     if key == "OPENAI_BASE_URL":
+        # Refuse BEFORE the probe: the request below carries the user's API
+        # key, so probing a blocked host would leak the credential to it.
+        _blocked = _blocked_base_url_domain(value)
+        if _blocked:
+            return {
+                "ok": False,
+                "reachable": True,
+                "message": (
+                    f"{_blocked} is a service operated from the PRC; Hermes no "
+                    f"longer integrates with these services."
+                ),
+                "models": [],
+            }
         url = value.rstrip("/") + "/models"
         # Send the optional API key so endpoints that require auth on
         # ``/v1/models`` (many hosted OpenAI-compatible servers) still enumerate
@@ -9203,60 +9265,10 @@ _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
         "env_vars": ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"),
         "required_env": ("TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"),
     },
-    "dingtalk": {
-        "name": "DingTalk",
-        "description": "Connect Hermes to DingTalk groups (钉钉).",
-        "docs_url": "https://open.dingtalk.com/document/orgapp/the-robot-development-process",
-        "env_vars": ("DINGTALK_CLIENT_ID", "DINGTALK_CLIENT_SECRET"),
-        "required_env": ("DINGTALK_CLIENT_ID", "DINGTALK_CLIENT_SECRET"),
-    },
-    "feishu": {
-        "name": "Feishu / Lark",
-        "description": "Use Hermes inside Feishu / Lark.",
-        "docs_url": "https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/intro",
-        "env_vars": (
-            "FEISHU_APP_ID",
-            "FEISHU_APP_SECRET",
-            "FEISHU_ENCRYPT_KEY",
-            "FEISHU_VERIFICATION_TOKEN",
-        ),
-        "required_env": ("FEISHU_APP_ID", "FEISHU_APP_SECRET"),
-    },
     "google_chat": {
         "name": "Google Chat",
         "description": "Connect Hermes to Google Chat via Cloud Pub/Sub.",
         "docs_url": "https://hermes-agent.nousresearch.com/docs/user-guide/messaging/google_chat",
-    },
-    "wecom": {
-        "name": "WeCom (group bot)",
-        "description": "Send-only WeCom group bot via webhook.",
-        "docs_url": "https://developer.work.weixin.qq.com/document/path/91770",
-        "env_vars": ("WECOM_BOT_ID", "WECOM_SECRET"),
-        "required_env": ("WECOM_BOT_ID",),
-    },
-    "wecom_callback": {
-        "name": "WeCom (app)",
-        "description": "Two-way WeCom integration via callback app.",
-        "docs_url": "https://developer.work.weixin.qq.com/document/path/90930",
-        "env_vars": (
-            "WECOM_CALLBACK_CORP_ID",
-            "WECOM_CALLBACK_CORP_SECRET",
-            "WECOM_CALLBACK_AGENT_ID",
-            "WECOM_CALLBACK_TOKEN",
-            "WECOM_CALLBACK_ENCODING_AES_KEY",
-        ),
-        "required_env": (
-            "WECOM_CALLBACK_CORP_ID",
-            "WECOM_CALLBACK_CORP_SECRET",
-            "WECOM_CALLBACK_AGENT_ID",
-        ),
-    },
-    "weixin": {
-        "name": "Weixin / WeChat (Personal)",
-        "description": "Connect a personal WeChat account through Tencent's iLink Bot API.",
-        "docs_url": "https://hermes-agent.nousresearch.com/docs/user-guide/messaging/weixin/",
-        "env_vars": ("WEIXIN_ACCOUNT_ID", "WEIXIN_TOKEN", "WEIXIN_BASE_URL"),
-        "required_env": ("WEIXIN_ACCOUNT_ID", "WEIXIN_TOKEN"),
     },
     "bluebubbles": {
         "name": "BlueBubbles (iMessage)",
@@ -9268,13 +9280,6 @@ _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
             "BLUEBUBBLES_ALLOWED_USERS",
         ),
         "required_env": ("BLUEBUBBLES_SERVER_URL", "BLUEBUBBLES_PASSWORD"),
-    },
-    "qqbot": {
-        "name": "QQ Bot",
-        "description": "Connect Hermes to a QQ Bot from the QQ Open Platform.",
-        "docs_url": "https://q.qq.com",
-        "env_vars": ("QQ_APP_ID", "QQ_CLIENT_SECRET", "QQ_ALLOWED_USERS"),
-        "required_env": ("QQ_APP_ID", "QQ_CLIENT_SECRET"),
     },
     # Teams ships as a platform plugin, so its name/env vars come from the
     # plugin registry. Only the docs link needs an override here so the
@@ -9309,12 +9314,6 @@ _PLATFORM_OVERRIDES: dict[str, dict[str, Any]] = {
     "simplex": {
         "description": "Talk to Hermes over SimpleX Chat via a local simplex-chat daemon.",
         "docs_url": "https://hermes-agent.nousresearch.com/docs/user-guide/messaging/simplex",
-    },
-    "yuanbao": {
-        "name": "Yuanbao (元宝)",
-        "description": "Connect Hermes to Tencent Yuanbao.",
-        "docs_url": "",
-        "required_env": (),
     },
     "api_server": {
         "name": "API server",
@@ -9369,14 +9368,7 @@ _PLATFORM_ORDER: tuple[str, ...] = (
     "homeassistant",
     "email",
     "sms",
-    "dingtalk",
-    "feishu",
     "google_chat",
-    "wecom",
-    "wecom_callback",
-    "weixin",
-    "qqbot",
-    "yuanbao",
     "api_server",
     "webhook",
 )
@@ -9451,72 +9443,6 @@ _MESSAGING_ENV_FALLBACKS: dict[str, dict[str, Any]] = {
     "TWILIO_AUTH_TOKEN": {
         "description": "Twilio Auth Token",
         "prompt": "Twilio Auth Token",
-        "password": True,
-    },
-    "WECOM_BOT_ID": {"description": "WeCom group bot ID", "prompt": "WeCom Bot ID"},
-    "WECOM_SECRET": {
-        "description": "WeCom group bot secret",
-        "prompt": "WeCom Secret",
-        "password": True,
-    },
-    "WECOM_CALLBACK_CORP_ID": {
-        "description": "WeCom corp ID",
-        "prompt": "WeCom Corp ID",
-    },
-    "WECOM_CALLBACK_CORP_SECRET": {
-        "description": "WeCom app corp secret",
-        "prompt": "WeCom Corp Secret",
-        "password": True,
-    },
-    "WECOM_CALLBACK_AGENT_ID": {
-        "description": "WeCom app agent ID",
-        "prompt": "WeCom Agent ID",
-    },
-    "WECOM_CALLBACK_TOKEN": {
-        "description": "WeCom callback verification token",
-        "prompt": "WeCom Token",
-    },
-    "WECOM_CALLBACK_ENCODING_AES_KEY": {
-        "description": "WeCom callback AES encoding key",
-        "prompt": "WeCom AES Key",
-        "password": True,
-    },
-    "WEIXIN_ACCOUNT_ID": {
-        "description": "iLink Bot account ID obtained through QR login in hermes gateway setup",
-        "prompt": "iLink Bot account ID",
-    },
-    "WEIXIN_TOKEN": {
-        "description": "iLink Bot token obtained through QR login in hermes gateway setup",
-        "prompt": "iLink Bot token",
-        "password": True,
-    },
-    "WEIXIN_BASE_URL": {
-        "description": "iLink API base URL saved by QR login (default: https://ilinkai.weixin.qq.com)",
-        "prompt": "iLink API base URL",
-    },
-    "FEISHU_APP_ID": {"description": "Feishu / Lark app ID", "prompt": "App ID"},
-    "FEISHU_APP_SECRET": {
-        "description": "Feishu / Lark app secret",
-        "prompt": "App secret",
-        "password": True,
-    },
-    "FEISHU_ENCRYPT_KEY": {
-        "description": "Feishu / Lark encrypt key",
-        "prompt": "Encrypt key",
-        "password": True,
-    },
-    "FEISHU_VERIFICATION_TOKEN": {
-        "description": "Feishu / Lark verification token",
-        "prompt": "Verification token",
-        "password": True,
-    },
-    "DINGTALK_CLIENT_ID": {
-        "description": "DingTalk client ID (App key)",
-        "prompt": "Client ID",
-    },
-    "DINGTALK_CLIENT_SECRET": {
-        "description": "DingTalk client secret (App secret)",
-        "prompt": "Client secret",
         "password": True,
     },
 }
@@ -9616,10 +9542,7 @@ def _platform_env_prefixes(platform_id: str) -> tuple[str, ...]:
     aliases: dict[str, tuple[str, ...]] = {
         "email": ("EMAIL_",),
         "homeassistant": ("HASS_",),
-        "qqbot": ("QQ_", "QQBOT_"),
         "sms": ("TWILIO_",),
-        "wecom": ("WECOM_BOT_", "WECOM_SECRET"),
-        "wecom_callback": ("WECOM_CALLBACK_",),
     }
     if platform_id in aliases:
         return aliases[platform_id]
@@ -11220,27 +11143,6 @@ _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
         "status_fn": None,  # dispatched via auth.get_codex_auth_status
     },
     {
-        "id": "qwen-oauth",
-        "name": "Qwen (via Qwen CLI)",
-        "flow": "external",
-        "cli_command": "hermes auth add qwen-oauth",
-        "docs_url": "https://github.com/QwenLM/qwen-code",
-        "status_fn": None,  # dispatched via auth.get_qwen_auth_status
-    },
-    {
-        "id": "minimax-oauth",
-        "name": "MiniMax (OAuth)",
-        # MiniMax's flow is structurally device-code (verification URI +
-        # user code, backend polls the token endpoint) with a PKCE
-        # extension for code-binding. The dashboard renders the same UX
-        # as Nous's device-code flow; the PKCE bit is a security
-        # extension that doesn't change the operator experience.
-        "flow": "device_code",
-        "cli_command": "hermes auth add minimax-oauth",
-        "docs_url": "https://www.minimax.io",
-        "status_fn": None,  # dispatched via auth.get_minimax_oauth_auth_status
-    },
-    {
         "id": "xai-oauth",
         "name": "xAI Grok OAuth (SuperGrok / Premium+)",
         # Device code is the default because it works in remote shells,
@@ -11324,26 +11226,6 @@ def _resolve_provider_status(provider_id: str, status_fn) -> Dict[str, Any]:
                 "expires_at": None,
                 "has_refresh_token": False,
                 "last_refresh": raw.get("last_refresh"),
-            }
-        if provider_id == "qwen-oauth":
-            raw = hauth.get_qwen_auth_status()
-            return {
-                "logged_in": bool(raw.get("logged_in")),
-                "source": "qwen_cli",
-                "source_label": raw.get("auth_store_path") or "Qwen CLI",
-                "token_preview": _truncate_token(raw.get("access_token")),
-                "expires_at": raw.get("expires_at"),
-                "has_refresh_token": bool(raw.get("has_refresh_token")),
-            }
-        if provider_id == "minimax-oauth":
-            raw = hauth.get_minimax_oauth_auth_status()
-            return {
-                "logged_in": bool(raw.get("logged_in")),
-                "source": "minimax_oauth",
-                "source_label": f"MiniMax ({raw.get('region', 'global')})",
-                "token_preview": None,
-                "expires_at": raw.get("expires_at"),
-                "has_refresh_token": True,
             }
         if provider_id == "xai-oauth":
             raw = hauth.get_xai_oauth_auth_status()
@@ -11790,82 +11672,6 @@ async def _start_device_code_flow(
             "poll_interval": int(s.get("interval") or 5),
         }
 
-    if provider_id == "minimax-oauth":
-        # MiniMax uses a device-code-style flow (verification URI + user
-        # code + background poll) with a PKCE extension on top. From the
-        # operator's perspective it's identical to Nous's device-code
-        # flow; the PKCE bit (verifier + challenge from
-        # _minimax_pkce_pair) is a security extension that binds the
-        # token exchange to the original session.
-        from hermes_cli.auth import (
-            _minimax_pkce_pair,
-            _minimax_request_user_code,
-            MINIMAX_OAUTH_CLIENT_ID,
-            MINIMAX_OAUTH_GLOBAL_BASE,
-        )
-        import httpx
-        verifier, challenge, state = _minimax_pkce_pair()
-        portal_base_url = (
-            os.getenv("MINIMAX_PORTAL_BASE_URL") or MINIMAX_OAUTH_GLOBAL_BASE
-        ).rstrip("/")
-        def _do_minimax_request():
-            with httpx.Client(
-                timeout=httpx.Timeout(15.0),
-                headers={"Accept": "application/json"},
-                follow_redirects=True,
-            ) as client:
-                return _minimax_request_user_code(
-                    client=client,
-                    portal_base_url=portal_base_url,
-                    client_id=MINIMAX_OAUTH_CLIENT_ID,
-                    code_challenge=challenge,
-                    state=state,
-                )
-        device_data = await asyncio.get_event_loop().run_in_executor(
-            None, _do_minimax_request
-        )
-        sid, sess = _new_oauth_session("minimax-oauth", "device_code", profile=profile)
-        # The CLI flow names this `interval_ms` because MiniMax's
-        # `interval` field is in milliseconds (defensive default 2000ms
-        # in _minimax_poll_token).
-        interval_raw = device_data.get("interval")
-        sess["interval_ms"] = (
-            int(interval_raw) if interval_raw is not None else None
-        )
-        sess["user_code"] = str(device_data["user_code"])
-        sess["code_verifier"] = verifier
-        sess["state"] = state
-        sess["portal_base_url"] = portal_base_url
-        sess["client_id"] = MINIMAX_OAUTH_CLIENT_ID
-        sess["region"] = "global"
-        # `expired_in` from MiniMax is overloaded — could be a unix-ms
-        # timestamp OR a seconds-from-now duration. Mirror the heuristic
-        # in _minimax_poll_token. Stash the raw value for the poller;
-        # compute a derived expires_at + UI-friendly expires_in seconds.
-        expired_in_raw = int(device_data["expired_in"])
-        sess["expired_in_raw"] = expired_in_raw
-        if expired_in_raw > 1_000_000_000_000:  # likely unix-ms
-            expires_at_ts = expired_in_raw / 1000.0
-            expires_in_seconds = max(0, int(expires_at_ts - time.time()))
-        else:
-            expires_at_ts = time.time() + expired_in_raw
-            expires_in_seconds = expired_in_raw
-        sess["expires_at"] = expires_at_ts
-        threading.Thread(
-            target=_minimax_poller,
-            args=(sid,),
-            daemon=True,
-            name=f"oauth-poll-{sid[:6]}",
-        ).start()
-        return {
-            "session_id": sid,
-            "flow": "device_code",
-            "user_code": str(device_data["user_code"]),
-            "verification_url": str(device_data["verification_uri"]),
-            "expires_in": expires_in_seconds,
-            "poll_interval": max(2, (sess["interval_ms"] or 2000) // 1000),
-        }
-
     if provider_id == "xai-oauth":
         from hermes_cli.auth import _xai_oauth_request_device_code
         import httpx
@@ -11964,90 +11770,6 @@ def _nous_poller(session_id: str) -> None:
         _log.info("oauth/device: nous login completed (session=%s)", session_id)
     except Exception as e:
         _log.warning("nous device-code poll failed (session=%s): %s", session_id, e)
-        with _oauth_sessions_lock:
-            sess["status"] = "error"
-            sess["error_message"] = str(e)
-
-
-def _minimax_poller(session_id: str) -> None:
-    """Background poller that drives a MiniMax OAuth flow to completion.
-
-    Mirrors `_nous_poller` but calls the MiniMax-specific token endpoint,
-    which uses a PKCE-style ``code_verifier`` + ``user_code`` rather than
-    the ``device_code`` field used by Nous. On success, builds the same
-    auth_state dict that ``_minimax_oauth_login`` (the CLI flow) builds
-    and persists via ``_minimax_save_auth_state`` — so the dashboard
-    path leaves the system in the same state as
-    ``hermes auth add minimax-oauth``.
-    """
-    from hermes_cli.auth import (
-        _minimax_poll_token,
-        _minimax_resolve_token_expiry_unix,
-        _minimax_save_auth_state,
-        MINIMAX_OAUTH_GLOBAL_INFERENCE,
-        MINIMAX_OAUTH_SCOPE,
-    )
-    from datetime import datetime, timezone
-    import httpx
-    with _oauth_sessions_lock:
-        sess = _oauth_sessions.get(session_id)
-    if not sess:
-        return
-    portal_base_url = sess["portal_base_url"]
-    client_id = sess["client_id"]
-    user_code = sess["user_code"]
-    code_verifier = sess["code_verifier"]
-    interval_ms = sess.get("interval_ms")
-    expired_in_raw = sess["expired_in_raw"]
-    try:
-        with httpx.Client(
-            timeout=httpx.Timeout(15.0),
-            headers={"Accept": "application/json"},
-            follow_redirects=True,
-        ) as client:
-            token_data = _minimax_poll_token(
-                client=client,
-                portal_base_url=portal_base_url,
-                client_id=client_id,
-                user_code=user_code,
-                code_verifier=code_verifier,
-                expired_in=expired_in_raw,
-                interval_ms=interval_ms,
-            )
-        # Build the auth_state dict in the same shape as the CLI flow's
-        # `_minimax_oauth_login` so `_minimax_save_auth_state` writes
-        # the canonical record. Region is fixed to "global" for the
-        # dashboard path; cn-region operators can still use the CLI
-        # flow which supports `--region cn`.
-        now = datetime.now(timezone.utc)
-        expires_at_ts = _minimax_resolve_token_expiry_unix(
-            int(token_data["expired_in"]), now=now,
-        )
-        expires_in_s = max(0, int(expires_at_ts - now.timestamp()))
-        auth_state = {
-            "provider": "minimax-oauth",
-            "region": sess.get("region", "global"),
-            "portal_base_url": portal_base_url,
-            "inference_base_url": MINIMAX_OAUTH_GLOBAL_INFERENCE,
-            "client_id": client_id,
-            "scope": MINIMAX_OAUTH_SCOPE,
-            "token_type": token_data.get("token_type", "Bearer"),
-            "access_token": token_data["access_token"],
-            "refresh_token": token_data["refresh_token"],
-            "resource_url": token_data.get("resource_url"),
-            "obtained_at": now.isoformat(),
-            "expires_at": datetime.fromtimestamp(
-                expires_at_ts, tz=timezone.utc
-            ).isoformat(),
-            "expires_in": expires_in_s,
-        }
-        with _profile_scope(_oauth_session_profile(session_id)):
-            _minimax_save_auth_state(auth_state)
-        with _oauth_sessions_lock:
-            sess["status"] = "approved"
-        _log.info("oauth/device: minimax login completed (session=%s)", session_id)
-    except Exception as e:
-        _log.warning("minimax device-code poll failed (session=%s): %s", session_id, e)
         with _oauth_sessions_lock:
             sess["status"] = "error"
             sess["error_message"] = str(e)

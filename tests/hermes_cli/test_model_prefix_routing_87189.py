@@ -53,9 +53,9 @@ class TestVendorPrefixRouting:
 
     def test_provider_alias_prefix_canonicalized_when_configured(self, monkeypatch):
         monkeypatch.setattr(models, "_find_openrouter_slug", lambda _name: None)
-        monkeypatch.setattr(models, "_configured_provider_ids", lambda: {"zai"})
-        detected = models.detect_provider_for_model("glm/glm-4.7", "anthropic")
-        assert detected == ("zai", "glm-4.7")
+        monkeypatch.setattr(models, "_configured_provider_ids", lambda: {"xai"})
+        detected = models.detect_provider_for_model("grok/grok-4-fast", "anthropic")
+        assert detected == ("xai", "grok-4-fast")
 
     def test_unknown_vendor_prefix_still_unmatched(self, monkeypatch):
         monkeypatch.setattr(models, "_find_openrouter_slug", lambda _name: None)
@@ -65,16 +65,16 @@ class TestVendorPrefixRouting:
     def test_openrouter_slug_still_wins_over_prefix_routing(self, monkeypatch):
         """Aggregator-native slugs keep their existing OpenRouter routing."""
         monkeypatch.setattr(
-            models, "_find_openrouter_slug", lambda _name: "deepseek/deepseek-chat"
+            models, "_find_openrouter_slug", lambda _name: "openai/gpt-5.2"
         )
-        monkeypatch.setattr(models, "_configured_provider_ids", lambda: {"deepseek"})
-        detected = models.detect_provider_for_model("deepseek/deepseek-chat", "anthropic")
-        assert detected == ("openrouter", "deepseek/deepseek-chat")
+        monkeypatch.setattr(models, "_configured_provider_ids", lambda: {"openai-api"})
+        detected = models.detect_provider_for_model("openai/gpt-5.2", "anthropic")
+        assert detected == ("openrouter", "openai/gpt-5.2")
 
     def test_bare_model_detection_unchanged(self, monkeypatch):
         monkeypatch.setattr(models, "_find_openrouter_slug", lambda _name: None)
-        detected = models.detect_provider_for_model("deepseek-chat", "anthropic")
-        assert detected == ("deepseek", "deepseek-chat")
+        detected = models.detect_provider_for_model("gpt-5.2", "anthropic")
+        assert detected == ("opencode-zen", "gpt-5.2")
 
 
 class TestDictModelAliases:

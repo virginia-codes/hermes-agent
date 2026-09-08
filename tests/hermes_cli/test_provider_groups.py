@@ -38,14 +38,14 @@ def test_reverse_index_matches_groups():
 
 
 def test_multi_member_group_folds_to_one_row():
-    rows = group_providers(["minimax", "minimax-oauth", "minimax-cn"])
+    rows = group_providers(["opencode-zen", "opencode-go", "opencode-free"])
     assert len(rows) == 1
     row = rows[0]
     assert row["kind"] == "group"
-    assert row["group_id"] == "minimax"
-    assert row["members"] == ["minimax", "minimax-oauth", "minimax-cn"]
+    assert row["group_id"] == "opencode"
+    assert row["members"] == ["opencode-zen", "opencode-go", "opencode-free"]
     # group rows carry the short top-level description from PROVIDER_GROUPS
-    assert row["description"] == PROVIDER_GROUPS["minimax"][1]
+    assert row["description"] == PROVIDER_GROUPS["opencode"][1]
     assert row["description"]
 
 

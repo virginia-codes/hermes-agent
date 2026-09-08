@@ -12,20 +12,12 @@ Full docs: https://hermes-agent.nousresearch.com/docs/integrations/providers
 | anthropic | API key | `ANTHROPIC_API_KEY` (also `CLAUDE_CODE_OAUTH_TOKEN`) |
 | nous | OAuth device code | `hermes auth add nous` (or `NOUS_API_KEY`) |
 | openai-codex | OAuth | `hermes auth add openai-codex` |
-| qwen-oauth | OAuth | `hermes auth add qwen-oauth` |
-| minimax-oauth | OAuth | `hermes auth add minimax-oauth` |
 | copilot | Token | `COPILOT_GITHUB_TOKEN` / `GH_TOKEN` (Copilot device flow — `gh auth login` tokens do NOT work) |
 | copilot-acp | External CLI | Copilot CLI on PATH or `COPILOT_CLI_PATH` |
 | gemini | API key | `GOOGLE_API_KEY` or `GEMINI_API_KEY` |
 | xai | API key | `XAI_API_KEY` (SuperGrok OAuth also supported) |
-| deepseek | API key | `DEEPSEEK_API_KEY` |
-| zai (GLM) | API key | `GLM_API_KEY` / `ZAI_API_KEY` |
-| minimax / minimax-cn | API key | `MINIMAX_API_KEY` / `MINIMAX_CN_API_KEY` |
-| kimi-coding / -cn | API key | `KIMI_API_KEY` / `KIMI_CN_API_KEY` |
-| alibaba (+coding-plan) | API key | `DASHSCOPE_API_KEY` / `ALIBABA_CODING_PLAN_API_KEY` |
-| xiaomi | API key | `XIAOMI_API_KEY` |
 | huggingface | Token | `HF_TOKEN` |
-| fireworks / novita / nvidia / deepinfra / gmi / arcee / stepfun / upstage / kilocode / ai-gateway / opencode-zen / opencode-go / ollama-cloud | API key | `<NAME>_API_KEY` |
+| fireworks / novita / nvidia / deepinfra / gmi / arcee / upstage / kilocode / ai-gateway / opencode-zen / opencode-go / ollama-cloud | API key | `<NAME>_API_KEY` |
 | bedrock / vertex / azure-foundry | Cloud SDK / key | AWS SDK creds / Vertex ADC / `AZURE_FOUNDRY_API_KEY` |
 | custom | Config | `model.base_url` + `model.api_key` in config.yaml |
 
@@ -44,8 +36,8 @@ model_aliases:
   fav:
     model: claude-sonnet-4.6
     provider: anthropic
-  local-qwen:
-    model: qwen3.5:397b
+  local-oss:
+    model: gpt-oss:120b
     provider: custom
     base_url: "https://ollama.com/v1"
   theta:
@@ -70,5 +62,5 @@ the provider that was active before the switch.
 
 Built-in aliases (catalog-resolved against the active provider): `sonnet`,
 `opus`, `haiku`, `claude`, `gpt5`, `gpt`, `codex`, `o3`, `o4`, `gemini`,
-`deepseek`, `grok`, `llama`, `qwen`, `minimax`, `nemotron`, `kimi`, `glm`,
+`grok`, `llama`, `nemotron`,
 `step`, `mimo`, `trinity`.

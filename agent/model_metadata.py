@@ -120,10 +120,10 @@ def _strip_provider_prefix(model: str) -> str:
     Provider names and aliases come from the provider-profile registry, so
     bundled and user plugins are recognised without a core catalog update.
 
-    ``"local:my-model"`` → ``"my-model"``
-    ``"qwen3.5:27b"``   → ``"qwen3.5:27b"``  (unchanged — not a provider prefix)
-    ``"qwen:0.5b"``     → ``"qwen:0.5b"``    (unchanged — Ollama model:tag)
-    ``"deepseek:latest"``→ ``"deepseek:latest"``(unchanged — Ollama model:tag)
+    ``"local:my-model"``  → ``"my-model"``
+    ``"qwen3.5:27b"``     → ``"qwen3.5:27b"``  (unchanged — not a provider prefix)
+    ``"gmi:0.5b"``        → ``"gmi:0.5b"``     (unchanged — Ollama model:tag)
+    ``"nvidia:latest"``   → ``"nvidia:latest"``(unchanged — Ollama model:tag)
     """
     if ":" not in model or model.startswith("http"):
         return model

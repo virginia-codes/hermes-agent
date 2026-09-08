@@ -65,7 +65,7 @@ class TestCuratedModelsForProvider:
             "hermes_cli.models.fetch_openrouter_models",
             return_value=[
                 ("anthropic/claude-opus-4.6", "recommended"),
-                ("qwen/qwen3.6-plus", ""),
+                ("google/gemini-3-flash", ""),
             ],
         ):
             models = curated_models_for_provider("openrouter")
@@ -81,18 +81,13 @@ class TestCuratedModelsForProvider:
 class TestNormalizeProvider:
 
     def test_known_aliases(self):
-        assert normalize_provider("glm") == "zai"
-        assert normalize_provider("kimi") == "kimi-coding"
-        assert normalize_provider("moonshot") == "kimi-coding"
-        assert normalize_provider("step") == "stepfun"
         assert normalize_provider("github-copilot") == "copilot"
+        assert normalize_provider("grok") == "xai"
 
 
 class TestProviderLabel:
     def test_known_labels_and_auto(self):
         assert provider_label("anthropic") == "Anthropic"
-        assert provider_label("kimi") == "Kimi / Kimi Coding Plan"
-        assert provider_label("stepfun") == "StepFun Step Plan"
         assert provider_label("copilot") == "GitHub Copilot"
         assert provider_label("copilot-acp") == "GitHub Copilot ACP"
         assert provider_label("auto") == "Auto"

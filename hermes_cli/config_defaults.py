@@ -1661,10 +1661,6 @@ DEFAULT_CONFIG = {
             "telegram": {"streaming": True},
             "discord": {"streaming": False},
             "slack": {"streaming": False},
-            # WeCom uses native streaming (msgtype: "stream") via
-            # aibot_respond_msg — opt in by default so the WeCom client
-            # renders the typing animation and cumulative content updates.
-            "wecom": {"streaming": True},
         },
         # Gateway runtime-metadata footer appended to the FINAL message of a turn
         # (disabled by default to keep replies minimal). When enabled, renders
@@ -2131,8 +2127,8 @@ DEFAULT_CONFIG = {
         # store reserved for explicit high-frequency operational facts.
         "nudge_interval": 10,
         # External memory provider plugin (empty = built-in only).
-        # Set to a provider name to activate: "openviking", "mem0",
-        # "hindsight", "holographic", "retaindb", "byterover".
+        # Set to a provider name to activate: "mem0", "hindsight",
+        # "holographic", "retaindb", "byterover".
         # Only ONE external provider is allowed at a time.
         "provider": "",
     },
@@ -2140,7 +2136,7 @@ DEFAULT_CONFIG = {
     # Subagent delegation — override the provider:model used by delegate_task
     # so child agents can run on a different (cheaper/faster) provider and model.
     # Uses the same runtime provider resolution as CLI/gateway startup, so all
-    # configured providers (OpenRouter, Nous, Z.ai, Kimi, etc.) are supported.
+    # configured providers (OpenRouter, Nous, Anthropic, etc.) are supported.
     "delegation": {
         "model": "",       # e.g. "google/gemini-3-flash-preview" (empty = inherit parent model)
         "provider": "",    # e.g. "openrouter" (empty = inherit parent provider + credentials)
@@ -4221,78 +4217,6 @@ OPTIONAL_ENV_VARS = {
         "category": "provider",
         "advanced": True,
     },
-    "GLM_API_KEY": {
-        "description": "Z.AI / GLM API key (also recognized as ZAI_API_KEY / Z_AI_API_KEY)",
-        "prompt": "Z.AI / GLM API key",
-        "url": "https://z.ai/",
-        "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "ZAI_API_KEY": {
-        "description": "Z.AI API key (alias for GLM_API_KEY)",
-        "prompt": "Z.AI API key",
-        "url": "https://z.ai/",
-        "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "Z_AI_API_KEY": {
-        "description": "Z.AI API key (alias for GLM_API_KEY)",
-        "prompt": "Z.AI API key",
-        "url": "https://z.ai/",
-        "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "GLM_BASE_URL": {
-        "description": "Z.AI / GLM base URL override",
-        "prompt": "Z.AI / GLM base URL (leave empty for default)",
-        "url": None,
-        "password": False,
-        "category": "provider",
-        "advanced": True,
-    },
-    "KIMI_API_KEY": {
-        "description": "Kimi / Moonshot API key",
-        "prompt": "Kimi API key",
-        "url": "https://platform.moonshot.cn/",
-        "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "KIMI_BASE_URL": {
-        "description": "Kimi / Moonshot base URL override",
-        "prompt": "Kimi base URL (leave empty for default)",
-        "url": None,
-        "password": False,
-        "category": "provider",
-        "advanced": True,
-    },
-    "KIMI_CN_API_KEY": {
-        "description": "Kimi / Moonshot China API key",
-        "prompt": "Kimi (China) API key",
-        "url": "https://platform.moonshot.cn/",
-        "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "STEPFUN_API_KEY": {
-        "description": "StepFun Step Plan API key",
-        "prompt": "StepFun Step Plan API key",
-        "url": "https://platform.stepfun.com/",
-        "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "STEPFUN_BASE_URL": {
-        "description": "StepFun Step Plan base URL override",
-        "prompt": "StepFun Step Plan base URL (leave empty for default)",
-        "url": None,
-        "password": False,
-        "category": "provider",
-        "advanced": True,
-    },
     "ARCEEAI_API_KEY": {
         "description": "Arcee AI API key",
         "prompt": "Arcee AI API key",
@@ -4346,75 +4270,6 @@ OPTIONAL_ENV_VARS = {
         "prompt": "Fireworks AI API key",
         "url": "https://app.fireworks.ai/settings/users/api-keys",
         "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "MINIMAX_API_KEY": {
-        "description": "MiniMax API key (international)",
-        "prompt": "MiniMax API key",
-        "url": "https://www.minimax.io/",
-        "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "MINIMAX_BASE_URL": {
-        "description": "MiniMax base URL override",
-        "prompt": "MiniMax base URL (leave empty for default)",
-        "url": None,
-        "password": False,
-        "category": "provider",
-        "advanced": True,
-    },
-    "MINIMAX_CN_API_KEY": {
-        "description": "MiniMax API key (China endpoint)",
-        "prompt": "MiniMax (China) API key",
-        "url": "https://www.minimaxi.com/",
-        "password": True,
-        "category": "provider",
-        "advanced": True,
-    },
-    "MINIMAX_CN_BASE_URL": {
-        "description": "MiniMax (China) base URL override",
-        "prompt": "MiniMax (China) base URL (leave empty for default)",
-        "url": None,
-        "password": False,
-        "category": "provider",
-        "advanced": True,
-    },
-    "DEEPSEEK_API_KEY": {
-        "description": "DeepSeek API key for direct DeepSeek access",
-        "prompt": "DeepSeek API Key",
-        "url": "https://platform.deepseek.com/api_keys",
-        "password": True,
-        "category": "provider",
-    },
-    "DEEPSEEK_BASE_URL": {
-        "description": "Custom DeepSeek API base URL (advanced)",
-        "prompt": "DeepSeek Base URL",
-        "url": "",
-        "password": False,
-        "category": "provider",
-    },
-    "DASHSCOPE_API_KEY": {
-        "description": "Alibaba Cloud DashScope API key (Qwen + multi-provider models)",
-        "prompt": "DashScope API Key",
-        "url": "https://modelstudio.console.alibabacloud.com/",
-        "password": True,
-        "category": "provider",
-    },
-    "DASHSCOPE_BASE_URL": {
-        "description": "Custom DashScope base URL (default: coding-intl OpenAI-compat endpoint)",
-        "prompt": "DashScope Base URL",
-        "url": "",
-        "password": False,
-        "category": "provider",
-        "advanced": True,
-    },
-    "HERMES_QWEN_BASE_URL": {
-        "description": "Qwen Portal base URL override (default: https://portal.qwen.ai/v1)",
-        "prompt": "Qwen Portal base URL (leave empty for default)",
-        "url": None,
-        "password": False,
         "category": "provider",
         "advanced": True,
     },
@@ -4484,21 +4339,6 @@ OPTIONAL_ENV_VARS = {
     "OLLAMA_BASE_URL": {
         "description": "Ollama Cloud base URL override (default: https://ollama.com/v1)",
         "prompt": "Ollama base URL (leave empty for default)",
-        "url": None,
-        "password": False,
-        "category": "provider",
-        "advanced": True,
-    },
-    "XIAOMI_API_KEY": {
-        "description": "Xiaomi MiMo API key for MiMo models (mimo-v2.5-pro, mimo-v2.5, mimo-v2-pro, mimo-v2-omni, mimo-v2-flash)",
-        "prompt": "Xiaomi MiMo API Key",
-        "url": "https://platform.xiaomimimo.com",
-        "password": True,
-        "category": "provider",
-    },
-    "XIAOMI_BASE_URL": {
-        "description": "Xiaomi MiMo base URL override (default: https://api.xiaomimimo.com/v1)",
-        "prompt": "Xiaomi base URL (leave empty for default)",
         "url": None,
         "password": False,
         "category": "provider",
@@ -5117,48 +4957,6 @@ OPTIONAL_ENV_VARS = {
     "BLUEBUBBLES_ALLOW_ALL_USERS": {
         "description": "Allow all BlueBubbles users without allowlist",
         "prompt": "Allow All BlueBubbles Users",
-        "category": "messaging",
-    },
-    "QQ_APP_ID": {
-        "description": "QQ Bot App ID from QQ Open Platform (q.qq.com)",
-        "prompt": "QQ App ID",
-        "url": "https://q.qq.com",
-        "category": "messaging",
-    },
-    "QQ_CLIENT_SECRET": {
-        "description": "QQ Bot Client Secret from QQ Open Platform",
-        "prompt": "QQ Client Secret",
-        "password": True,
-        "category": "messaging",
-    },
-    "QQ_ALLOWED_USERS": {
-        "description": "Comma-separated QQ user IDs allowed to use the bot",
-        "prompt": "QQ Allowed Users",
-        "category": "messaging",
-    },
-    "QQ_GROUP_ALLOWED_USERS": {
-        "description": "Comma-separated QQ group IDs allowed to interact with the bot",
-        "prompt": "QQ Group Allowed Users",
-        "category": "messaging",
-    },
-    "QQ_ALLOW_ALL_USERS": {
-        "description": "Allow all QQ users without an allowlist (true/false)",
-        "prompt": "Allow All QQ Users",
-        "category": "messaging",
-    },
-    "QQBOT_HOME_CHANNEL": {
-        "description": "Default QQ channel/group for cron delivery and notifications",
-        "prompt": "QQ Home Channel",
-        "category": "messaging",
-    },
-    "QQBOT_HOME_CHANNEL_NAME": {
-        "description": "Display name for the QQ home channel",
-        "prompt": "QQ Home Channel Name",
-        "category": "messaging",
-    },
-    "QQ_SANDBOX": {
-        "description": "Enable QQ sandbox mode for development testing (true/false)",
-        "prompt": "QQ Sandbox Mode",
         "category": "messaging",
     },
     "IRC_SERVER": {

@@ -12,7 +12,7 @@ explicit import) so existing call sites — and test monkeypatches that target
 ``hermes_cli.main._model_flow_*`` — keep resolving against main.py's namespace.
 
 main.py-internal helpers the flows call (``_prompt_api_key``, ``_save_custom_provider``,
-the reasoning-effort/stepfun/qwen helpers, ``_run_anthropic_oauth_flow``, …) are
+the reasoning-effort helpers, ``_run_anthropic_oauth_flow``, …) are
 imported lazily inside the flows (``from hermes_cli.main import ...`` resolves at
 call time, when main.py is fully loaded) so this module never imports
 ``hermes_cli.main`` at import time -> no import cycle.
@@ -821,108 +821,6 @@ def _model_flow_xai_oauth(_config, current_model="", *, args=None):
         print(f"Default model set to: {selected} (via xAI Grok OAuth — SuperGrok / Premium+)")
     else:
         print("No change.")
-
-def _model_flow_qwen_oauth(_config, current_model=""):
-    """Qwen OAuth provider: reuse local Qwen CLI login, then pick model."""
-    from hermes_cli.main import _DEFAULT_QWEN_PORTAL_MODELS
-    from hermes_cli.auth import (
-        get_qwen_auth_status,
-        resolve_qwen_runtime_credentials,
-        _prompt_model_selection,
-        _save_model_choice,
-        _update_config_for_provider,
-        DEFAULT_QWEN_BASE_URL,
-    )
-    from hermes_cli.models import fetch_api_models
-
-    status = get_qwen_auth_status()
-    if not status.get("logged_in"):
-        print("Not logged into Qwen CLI OAuth.")
-        print("Run: qwen auth qwen-oauth")
-        auth_file = status.get("auth_file")
-        if auth_file:
-            print(f"Expected credentials file: {auth_file}")
-        if status.get("error"):
-            print(f"Error: {status.get('error')}")
-        return
-
-    # Try live model discovery, fall back to curated list.
-    models = None
-    try:
-        creds = resolve_qwen_runtime_credentials(refresh_if_expiring=True)
-        models = fetch_api_models(creds["api_key"], creds["base_url"])
-    except Exception:
-        pass
-    if not models:
-        models = list(_DEFAULT_QWEN_PORTAL_MODELS)
-
-    default = current_model or (models[0] if models else "qwen3-coder-plus")
-    selected = _prompt_model_selection(
-        models,
-        current_model=default,
-        confirm_provider="qwen-oauth",
-        confirm_base_url=DEFAULT_QWEN_BASE_URL,
-    )
-    if selected:
-        _save_model_choice(selected)
-        _update_config_for_provider("qwen-oauth", DEFAULT_QWEN_BASE_URL)
-        print(f"Default model set to: {selected} (via Qwen OAuth)")
-    else:
-        print("No change.")
-
-def _model_flow_minimax_oauth(config, current_model="", args=None):
-    """MiniMax OAuth provider: ensure logged in, then pick model."""
-    from hermes_cli.auth import (
-        get_provider_auth_state,
-        _prompt_model_selection,
-        _save_model_choice,
-        _update_config_for_provider,
-        resolve_minimax_oauth_runtime_credentials,
-        AuthError,
-        format_auth_error,
-        _login_minimax_oauth,
-        PROVIDER_REGISTRY,
-    )
-
-    state = get_provider_auth_state("minimax-oauth")
-    if not state or not state.get("access_token"):
-        print("Not logged into MiniMax. Starting OAuth login...")
-        print()
-        try:
-            mock_args = argparse.Namespace(
-                region=getattr(args, "region", None) or "global",
-                no_browser=bool(getattr(args, "no_browser", False)),
-                timeout=getattr(args, "timeout", None) or 15.0,
-            )
-            _login_minimax_oauth(mock_args, PROVIDER_REGISTRY["minimax-oauth"])
-        except SystemExit:
-            print("Login cancelled or failed.")
-            return
-        except Exception as exc:
-            print(f"Login failed: {exc}")
-            return
-
-    try:
-        creds = resolve_minimax_oauth_runtime_credentials()
-    except AuthError as exc:
-        print(format_auth_error(exc))
-        return
-
-    from hermes_cli.models import _PROVIDER_MODELS
-
-    model_ids = _PROVIDER_MODELS.get("minimax-oauth", [])
-    selected = _prompt_model_selection(
-        model_ids,
-        current_model,
-        confirm_provider="minimax-oauth",
-        confirm_base_url=creds["base_url"],
-    )
-    if not selected:
-        return
-    _save_model_choice(selected)
-    _update_config_for_provider("minimax-oauth", creds["base_url"])
-    print(f"\u2713 Using MiniMax model: {selected}")
-
 
 def _model_flow_custom(config):
     """Custom endpoint: collect URL, API key, and model name.
@@ -2145,209 +2043,6 @@ def _model_flow_copilot_acp(config, current_model=""):
 
     print(f"Default model set to: {selected} (via {pconfig.name})")
 
-def _model_flow_kimi(config, current_model=""):
-    """Kimi / Moonshot model selection with automatic endpoint routing.
-
-    - sk-kimi-* keys   → api.kimi.com/coding/v1  (Kimi Coding Plan)
-    - Other keys        → api.moonshot.ai/v1      (legacy Moonshot)
-
-    No manual base URL prompt — endpoint is determined by key prefix.
-    """
-    from hermes_cli.main import _prompt_api_key
-    from hermes_cli.auth import (
-        PROVIDER_REGISTRY,
-        KIMI_CODE_BASE_URL,
-        _prompt_model_selection,
-        _save_model_choice,
-        deactivate_provider,
-    )
-    from hermes_cli.config import (
-        get_env_value,
-        save_env_value,
-        load_config,
-        save_config,
-    )
-    from hermes_cli.models import _PROVIDER_MODELS
-
-    provider_id = "kimi-coding"
-    pconfig = PROVIDER_REGISTRY[provider_id]
-    base_url_env = pconfig.base_url_env_var or ""
-
-    # Step 1: Check / prompt for API key
-    existing_key, existing_source = _existing_api_key_for_model_flow(provider_id, pconfig)
-
-    existing_key, abort = _prompt_api_key(
-        pconfig,
-        existing_key,
-        provider_id=provider_id,
-        existing_source=existing_source,
-    )
-    if abort:
-        return
-
-    # Step 2: Auto-detect endpoint from key prefix
-    is_coding_plan = existing_key.startswith("sk-kimi-")
-    if is_coding_plan:
-        effective_base = KIMI_CODE_BASE_URL
-        print(f"  Detected Kimi Coding Plan key → {effective_base}")
-    else:
-        effective_base = pconfig.inference_base_url
-        print(f"  Using Moonshot endpoint → {effective_base}")
-    # Clear any manual base URL override so auto-detection works at runtime
-    if base_url_env and get_env_value(base_url_env):
-        save_env_value(base_url_env, "")
-    print()
-
-    # Step 3: Model selection — show appropriate models for the endpoint
-    model_list = _PROVIDER_MODELS.get("kimi-coding" if is_coding_plan else "moonshot", [])
-
-    if model_list:
-        selected = _prompt_model_selection(
-            model_list,
-            current_model=current_model,
-            confirm_provider=provider_id,
-            confirm_base_url=effective_base,
-            confirm_api_key=existing_key,
-        )
-    else:
-        try:
-            selected = line_input("Enter model name: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            selected = None
-
-    if selected:
-        _save_model_choice(selected)
-
-        # Update config with provider and base URL
-        cfg = load_config()
-        model = cfg.get("model")
-        if not isinstance(model, dict):
-            model = {"default": model} if model else {}
-            cfg["model"] = model
-        model["provider"] = provider_id
-        model["base_url"] = effective_base
-        model.pop("api_mode", None)  # let runtime auto-detect from URL
-        clear_model_endpoint_credentials(model, clear_api_mode=False)
-        save_config(cfg)
-        deactivate_provider()
-
-        endpoint_label = "Kimi Coding" if is_coding_plan else "Moonshot"
-        print(f"Default model set to: {selected} (via {endpoint_label})")
-    else:
-        print("No change.")
-
-def _model_flow_stepfun(config, current_model=""):
-    """StepFun Step Plan flow with region-specific endpoints."""
-    from hermes_cli.main import _infer_stepfun_region, _prompt_api_key, _prompt_provider_choice, _stepfun_base_url_for_region
-    from hermes_cli.auth import (
-        PROVIDER_REGISTRY,
-        _prompt_model_selection,
-        _save_model_choice,
-        deactivate_provider,
-    )
-    from hermes_cli.config import (
-        get_env_value,
-        save_env_value,
-        load_config,
-        save_config,
-    )
-    from hermes_cli.models import _PROVIDER_MODELS, fetch_api_models
-
-    provider_id = "stepfun"
-    pconfig = PROVIDER_REGISTRY[provider_id]
-    base_url_env = pconfig.base_url_env_var or ""
-
-    existing_key, existing_source = _existing_api_key_for_model_flow(provider_id, pconfig)
-
-    existing_key, abort = _prompt_api_key(
-        pconfig,
-        existing_key,
-        provider_id=provider_id,
-        existing_source=existing_source,
-    )
-    if abort:
-        return
-
-    current_base = ""
-    if base_url_env:
-        current_base = get_env_value(base_url_env) or os.getenv(base_url_env, "")
-    if not current_base:
-        model_cfg = config.get("model")
-        if isinstance(model_cfg, dict):
-            current_base = str(model_cfg.get("base_url") or "").strip()
-    current_region = _infer_stepfun_region(current_base or pconfig.inference_base_url)
-
-    region_choices = [
-        (
-            "international",
-            f"International ({_stepfun_base_url_for_region('international')})",
-        ),
-        ("china", f"China ({_stepfun_base_url_for_region('china')})"),
-    ]
-    ordered_regions = []
-    for region_key, label in region_choices:
-        if region_key == current_region:
-            ordered_regions.insert(0, (region_key, f"{label}  ← currently active"))
-        else:
-            ordered_regions.append((region_key, label))
-    ordered_regions.append(("cancel", "Cancel"))
-
-    region_idx = _prompt_provider_choice([label for _, label in ordered_regions])
-    if region_idx is None or ordered_regions[region_idx][0] == "cancel":
-        print("No change.")
-        return
-
-    selected_region = ordered_regions[region_idx][0]
-    effective_base = _stepfun_base_url_for_region(selected_region)
-    if base_url_env:
-        save_env_value(base_url_env, effective_base)
-
-    live_models = fetch_api_models(existing_key, effective_base)
-    if live_models:
-        model_list = live_models
-        print(f"  Found {len(model_list)} model(s) from {pconfig.name} API")
-    else:
-        model_list = _PROVIDER_MODELS.get(provider_id, [])
-        if model_list:
-            print(
-                f"  Could not auto-detect models from {pconfig.name} API — "
-                "showing Step Plan fallback catalog."
-            )
-
-    if model_list:
-        selected = _prompt_model_selection(
-            model_list,
-            current_model=current_model,
-            confirm_provider=provider_id,
-            confirm_base_url=effective_base,
-            confirm_api_key=existing_key,
-        )
-    else:
-        try:
-            selected = line_input("Model name: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            selected = None
-
-    if selected:
-        _save_model_choice(selected)
-
-        cfg = load_config()
-        model = cfg.get("model")
-        if not isinstance(model, dict):
-            model = {"default": model} if model else {}
-            cfg["model"] = model
-        model["provider"] = provider_id
-        model["base_url"] = effective_base
-        model.pop("api_mode", None)
-        clear_model_endpoint_credentials(model, clear_api_mode=False)
-        save_config(cfg)
-        deactivate_provider()
-
-        config["model"] = dict(model)
-        print(f"Default model set to: {selected} (via {pconfig.name})")
-    else:
-        print("No change.")
-
 def _model_flow_bedrock_api_key(config, region, current_model=""):
     """Bedrock API Key mode — uses the OpenAI-compatible bedrock-mantle endpoint.
 
@@ -2774,64 +2469,6 @@ def _model_flow_vertex(config, current_model=""):
     else:
         print("  No change.")
 
-def _select_zai_endpoint(current_base: str) -> str:
-    """Present a picker for Z.AI endpoint selection during setup.
-
-    Offers the four official Z.AI endpoints (Global, China, Coding Plan
-    Global, Coding Plan China) plus a custom-proxy option.  The list is
-    sourced from ``ZAI_ENDPOINTS`` in ``hermes_cli.auth`` so it stays in
-    sync with the probe list.
-
-    Returns the selected base URL.  Falls back to *current_base* on cancel
-    or error.
-    """
-    from hermes_cli.main import _prompt_provider_choice
-    from hermes_cli.auth import ZAI_ENDPOINTS
-
-    # Build label + URL pairs from the shared endpoint list.
-    options = [(label, url) for _, url, _, label in ZAI_ENDPOINTS]
-    normalized_current = (current_base or "").strip().rstrip("/")
-
-    # Default to the currently-active option if it matches one of the
-    # known endpoints; otherwise default to the first (Global).
-    default_idx = 0
-    for idx, (_, url) in enumerate(options):
-        if normalized_current == url.rstrip("/"):
-            default_idx = idx
-            break
-    else:
-        if normalized_current:
-            # A custom URL is active — offer "Custom proxy" as the default.
-            default_idx = len(options)
-
-    choices = [f"{label} ({url})" for label, url in options]
-    choices.append("Custom proxy URL")
-
-    selected = _prompt_provider_choice(
-        choices,
-        default=default_idx,
-        title="Select Z.AI / GLM endpoint:",
-    )
-    if selected is None:
-        return current_base
-
-    if selected == len(options):
-        # Custom proxy URL
-        try:
-            override = line_input(f"Custom base URL [{current_base}]: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            print()
-            return current_base
-        if not override:
-            return current_base
-        if not override.startswith(("http://", "https://")):
-            print("  Invalid URL — must start with http:// or https://. Keeping current value.")
-            return current_base
-        return override.rstrip("/")
-
-    return options[selected][1].rstrip("/")
-
-
 def _model_flow_api_key_provider(config, provider_id, current_model=""):
     """Generic flow for API-key providers (z.ai, MiniMax, OpenCode, etc.)."""
     from hermes_cli.main import _prompt_api_key
@@ -2951,29 +2588,19 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
             pass
     effective_base = current_base or pconfig.inference_base_url
 
-    if provider_id == "zai":
-        # Z.AI has four official endpoints (Global, China, Coding Plan
-        # Global, Coding Plan China) with separate billing paths.  Present
-        # a picker instead of a plain text input so users can explicitly
-        # choose the endpoint that matches their key type.
-        chosen_base = _select_zai_endpoint(effective_base)
-        if chosen_base and chosen_base != effective_base and base_url_env:
-            save_env_value(base_url_env, chosen_base)
-        effective_base = chosen_base
-    else:
-        try:
-            override = line_input(f"Base URL [{effective_base}]: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            print()
-            override = ""
-        if override and base_url_env:
-            if not override.startswith(("http://", "https://")):
-                print(
-                    "  Invalid URL — must start with http:// or https://. Keeping current value."
-                )
-            else:
-                save_env_value(base_url_env, override)
-                effective_base = override
+    try:
+        override = line_input(f"Base URL [{effective_base}]: ").strip()
+    except (KeyboardInterrupt, EOFError):
+        print()
+        override = ""
+    if override and base_url_env:
+        if not override.startswith(("http://", "https://")):
+            print(
+                "  Invalid URL — must start with http:// or https://. Keeping current value."
+            )
+        else:
+            save_env_value(base_url_env, override)
+            effective_base = override
 
     # Model selection — resolution order:
     #   1. models.dev registry (cached, filtered for agentic/tool-capable models)

@@ -1,7 +1,7 @@
 """Tests for proactive vision-tool-message downgrade (issue #41072).
 
 When a provider supports vision in user messages but rejects list-type
-tool message content (e.g. Xiaomi MiMo's 400 "text is not set"),
+tool message content (e.g. Meta AI's 400 "text is not set"),
 ``_tool_result_content_for_active_model`` should proactively downgrade
 to a text summary instead of waiting for a reactive 400 recovery.
 
@@ -63,8 +63,8 @@ def _multimodal_result(text="screenshot", image_url="data:image/png;base64,AAAA"
 
 
 class TestProviderSupportsVisionToolMessages:
-    def test_xiaomi_returns_false(self):
-        agent = _make_agent("xiaomi", "mimo-v2.5")
+    def test_meta_ai_returns_false(self):
+        agent = _make_agent("meta-ai", "muse-spark-1.2")
         assert agent._provider_supports_vision_tool_messages() is False
 
 
@@ -79,9 +79,9 @@ class TestProviderSupportsVisionToolMessages:
 
 
 class TestToolResultContentProactiveDowngrade:
-    def test_xiaomi_downgrades_to_text_summary(self):
-        """Xiaomi: vision=True but supports_vision_tool_messages=False → text."""
-        agent = _make_agent("xiaomi", "mimo-v2.5")
+    def test_meta_ai_downgrades_to_text_summary(self):
+        """Meta AI: vision=True but supports_vision_tool_messages=False → text."""
+        agent = _make_agent("meta-ai", "muse-spark-1.2")
         result = _multimodal_result(text="screenshot captured")
 
         with patch.object(agent, "_model_supports_vision", return_value=True):
@@ -90,9 +90,9 @@ class TestToolResultContentProactiveDowngrade:
         assert isinstance(content, str)
         assert "screenshot captured" in content
 
-    def test_xiaomi_non_multimodal_passes_through(self):
+    def test_meta_ai_non_multimodal_passes_through(self):
         """Non-multimodal results should pass through unchanged."""
-        agent = _make_agent("xiaomi", "mimo-v2.5")
+        agent = _make_agent("meta-ai", "muse-spark-1.2")
         result = "plain text result"
 
         content = agent._tool_result_content_for_active_model("some_tool", result)
@@ -144,9 +144,9 @@ class TestProviderProfileField:
             # Class-level attribute default
             assert getattr(ProviderProfile, "supports_vision_tool_messages", True) is True
 
-    def test_xiaomi_profile_has_false(self):
+    def test_meta_ai_profile_has_false(self):
         from providers import get_provider_profile
-        profile = get_provider_profile("xiaomi")
+        profile = get_provider_profile("meta-ai")
         assert profile is not None
         assert profile.supports_vision_tool_messages is False
 

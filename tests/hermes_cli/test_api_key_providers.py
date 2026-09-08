@@ -1,4 +1,4 @@
-"""Tests for API-key provider support (z.ai/GLM, Kimi, MiniMax, AI Gateway)."""
+"""Tests for API-key provider support (AI Gateway, Copilot, HuggingFace, ...)."""
 
 import json
 import os
@@ -14,10 +14,6 @@ from hermes_cli.auth import (
     resolve_external_process_provider_credentials,
     get_auth_status,
     AuthError,
-    KIMI_CODE_BASE_URL,
-    STEPFUN_STEP_PLAN_INTL_BASE_URL,
-    STEPFUN_STEP_PLAN_CN_BASE_URL,
-    _resolve_kimi_base_url,
 )
 from hermes_cli.copilot_auth import _try_gh_cli_token
 
@@ -33,13 +29,8 @@ class TestProviderRegistry:
         ("copilot-acp", "GitHub Copilot ACP", "external_process"),
         ("copilot", "GitHub Copilot", "api_key"),
         ("huggingface", "Hugging Face", "api_key"),
-        ("zai", "Z.AI / GLM", "api_key"),
         ("xai", "xAI", "api_key"),
         ("nvidia", "NVIDIA NIM", "api_key"),
-        ("kimi-coding", "Kimi / Moonshot", "api_key"),
-        ("stepfun", "StepFun Step Plan", "api_key"),
-        ("minimax", "MiniMax", "api_key"),
-        ("minimax-cn", "MiniMax (China)", "api_key"),
         ("ai-gateway", "Vercel AI Gateway", "api_key"),
         ("kilocode", "Kilo Code", "api_key"),
         ("gmi", "GMI Cloud", "api_key"),
@@ -58,30 +49,6 @@ class TestProviderRegistry:
         pconfig = PROVIDER_REGISTRY["copilot"]
         assert pconfig.api_key_env_vars == ("COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN")
         assert pconfig.base_url_env_var == "COPILOT_API_BASE_URL"
-
-    def test_kimi_env_vars(self):
-        pconfig = PROVIDER_REGISTRY["kimi-coding"]
-        # KIMI_API_KEY is the primary env var; KIMI_CODING_API_KEY is a
-        # secondary fallback for Kimi Code sk-kimi- keys so users don't
-        # have to overload the same variable.
-        assert "KIMI_API_KEY" in pconfig.api_key_env_vars
-        assert "KIMI_CODING_API_KEY" in pconfig.api_key_env_vars
-        assert pconfig.base_url_env_var == "KIMI_BASE_URL"
-
-    def test_minimax_env_vars(self):
-        pconfig = PROVIDER_REGISTRY["minimax"]
-        assert pconfig.api_key_env_vars == ("MINIMAX_API_KEY",)
-        assert pconfig.base_url_env_var == "MINIMAX_BASE_URL"
-
-    def test_stepfun_env_vars(self):
-        pconfig = PROVIDER_REGISTRY["stepfun"]
-        assert pconfig.api_key_env_vars == ("STEPFUN_API_KEY",)
-        assert pconfig.base_url_env_var == "STEPFUN_BASE_URL"
-
-    def test_minimax_cn_env_vars(self):
-        pconfig = PROVIDER_REGISTRY["minimax-cn"]
-        assert pconfig.api_key_env_vars == ("MINIMAX_CN_API_KEY",)
-        assert pconfig.base_url_env_var == "MINIMAX_CN_BASE_URL"
 
     def test_ai_gateway_env_vars(self):
         pconfig = PROVIDER_REGISTRY["ai-gateway"]
@@ -106,11 +73,6 @@ class TestProviderRegistry:
     def test_base_urls(self):
         assert PROVIDER_REGISTRY["copilot"].inference_base_url == "https://api.githubcopilot.com"
         assert PROVIDER_REGISTRY["copilot-acp"].inference_base_url == "acp://copilot"
-        assert PROVIDER_REGISTRY["zai"].inference_base_url == "https://api.z.ai/api/paas/v4"
-        assert PROVIDER_REGISTRY["kimi-coding"].inference_base_url == "https://api.moonshot.ai/v1"
-        assert PROVIDER_REGISTRY["stepfun"].inference_base_url == STEPFUN_STEP_PLAN_INTL_BASE_URL
-        assert PROVIDER_REGISTRY["minimax"].inference_base_url == "https://api.minimax.io/anthropic"
-        assert PROVIDER_REGISTRY["minimax-cn"].inference_base_url == "https://api.minimaxi.com/anthropic"
         assert PROVIDER_REGISTRY["ai-gateway"].inference_base_url == "https://ai-gateway.vercel.sh/v1"
         assert PROVIDER_REGISTRY["kilocode"].inference_base_url == "https://api.kilo.ai/api/gateway"
         assert PROVIDER_REGISTRY["gmi"].inference_base_url == "https://api.gmi-serving.com/v1"
@@ -138,7 +100,7 @@ _EXTRA_ENV_VARS = (
     # Checked directly in resolve_provider("auto"), not via the registry.
     "OPENROUTER_API_KEY", "NOUS_API_KEY",
     # Base URLs / paths that influence detection but aren't api_key_env_vars.
-    "LM_BASE_URL", "KIMI_BASE_URL", "STEPFUN_BASE_URL", "KILOCODE_BASE_URL",
+    "LM_BASE_URL", "KILOCODE_BASE_URL",
     "GMI_BASE_URL", "OPENAI_BASE_URL",
     "HERMES_COPILOT_ACP_COMMAND", "COPILOT_CLI_PATH",
     "HERMES_COPILOT_ACP_ARGS", "COPILOT_ACP_BASE_URL",
@@ -162,13 +124,6 @@ def _clear_provider_env(monkeypatch):
 class TestResolveProvider:
     """Test resolve_provider() with new providers."""
 
-    def test_explicit_zai(self):
-        assert resolve_provider("zai") == "zai"
-
-
-
-
-
     def test_explicit_ai_gateway(self):
         assert resolve_provider("ai-gateway") == "ai-gateway"
 
@@ -176,21 +131,6 @@ class TestResolveProvider:
         assert resolve_provider("gmi") == "gmi"
 
 
-
-    def test_alias_zhipu(self):
-        assert resolve_provider("zhipu") == "zai"
-
-    def test_alias_kimi(self):
-        assert resolve_provider("kimi") == "kimi-coding"
-
-    def test_alias_moonshot(self):
-        assert resolve_provider("moonshot") == "kimi-coding"
-
-    def test_alias_step(self):
-        assert resolve_provider("step") == "stepfun"
-
-    def test_alias_minimax_underscore(self):
-        assert resolve_provider("minimax_cn") == "minimax-cn"
 
     def test_alias_aigateway(self):
         assert resolve_provider("aigateway") == "ai-gateway"
@@ -212,11 +152,6 @@ class TestResolveProvider:
 
     def test_alias_kilo_gateway(self):
         assert resolve_provider("kilo-gateway") == "kilocode"
-
-    def test_alias_case_insensitive(self):
-        assert resolve_provider("GLM") == "zai"
-        assert resolve_provider("Z-AI") == "zai"
-        assert resolve_provider("Kimi") == "kimi-coding"
 
     def test_alias_github_copilot(self):
         assert resolve_provider("github-copilot") == "copilot"
@@ -244,34 +179,6 @@ class TestResolveProvider:
         with pytest.raises(AuthError):
             resolve_provider("nonexistent-provider-xyz")
 
-    def test_auto_detects_glm_key(self, monkeypatch):
-        monkeypatch.setenv("GLM_API_KEY", "test-glm-key")
-        assert resolve_provider("auto") == "zai"
-
-    def test_auto_detects_zai_key(self, monkeypatch):
-        monkeypatch.setenv("ZAI_API_KEY", "test-zai-key")
-        assert resolve_provider("auto") == "zai"
-
-    def test_auto_detects_z_ai_key(self, monkeypatch):
-        monkeypatch.setenv("Z_AI_API_KEY", "test-z-ai-key")
-        assert resolve_provider("auto") == "zai"
-
-    def test_auto_detects_kimi_key(self, monkeypatch):
-        monkeypatch.setenv("KIMI_API_KEY", "test-kimi-key")
-        assert resolve_provider("auto") == "kimi-coding"
-
-    def test_auto_detects_stepfun_key(self, monkeypatch):
-        monkeypatch.setenv("STEPFUN_API_KEY", "test-stepfun-key")
-        assert resolve_provider("auto") == "stepfun"
-
-    def test_auto_detects_minimax_key(self, monkeypatch):
-        monkeypatch.setenv("MINIMAX_API_KEY", "test-mm-key")
-        assert resolve_provider("auto") == "minimax"
-
-    def test_auto_detects_minimax_cn_key(self, monkeypatch):
-        monkeypatch.setenv("MINIMAX_CN_API_KEY", "test-mm-cn-key")
-        assert resolve_provider("auto") == "minimax-cn"
-
     def test_auto_detects_ai_gateway_key(self, monkeypatch):
         monkeypatch.setenv("AI_GATEWAY_API_KEY", "test-gw-key")
         assert resolve_provider("auto") == "ai-gateway"
@@ -289,9 +196,9 @@ class TestResolveProvider:
         assert resolve_provider("auto") == "huggingface"
 
     def test_openrouter_takes_priority_over_glm(self, monkeypatch):
-        """OpenRouter API key should win over GLM in auto-detection."""
+        """OpenRouter API key should win over a provider key in auto-detection."""
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
-        monkeypatch.setenv("GLM_API_KEY", "glm-key")
+        monkeypatch.setenv("NVIDIA_API_KEY", "nv-key")
         assert resolve_provider("auto") == "openrouter"
 
     def test_auto_does_not_select_copilot_from_github_token(self, monkeypatch):
@@ -312,26 +219,6 @@ class TestResolveProvider:
 
 # =============================================================================
 # API Key Provider Status tests
-# =============================================================================
-
-class TestApiKeyProviderStatus:
-
-    def test_unconfigured_provider(self):
-        status = get_api_key_provider_status("zai")
-        assert status["configured"] is False
-        assert status["logged_in"] is False
-
-    def test_configured_provider(self, monkeypatch):
-        monkeypatch.setenv("GLM_API_KEY", "test-key-123")
-        status = get_api_key_provider_status("zai")
-        assert status["configured"] is True
-        assert status["logged_in"] is True
-        assert status["key_source"] == "GLM_API_KEY"
-        assert "z.ai" in status["base_url"].lower() or "api.z.ai" in status["base_url"]
-
-
-# =============================================================================
-# Credential Resolution tests
 # =============================================================================
 
 class TestResolveApiKeyProviderCredentials:
@@ -371,16 +258,6 @@ class TestResolveApiKeyProviderCredentials:
 
 
 
-    def test_resolve_stepfun_with_key(self, monkeypatch):
-        monkeypatch.setenv("STEPFUN_API_KEY", "stepfun-secret-key")
-        creds = resolve_api_key_provider_credentials("stepfun")
-        assert creds["provider"] == "stepfun"
-        assert creds["api_key"] == "stepfun-secret-key"
-        assert creds["base_url"] == STEPFUN_STEP_PLAN_INTL_BASE_URL
-
-
-
-
     def test_resolve_ai_gateway_with_key(self, monkeypatch):
         monkeypatch.setenv("AI_GATEWAY_API_KEY", "gw-secret-key")
         creds = resolve_api_key_provider_credentials("ai-gateway")
@@ -404,24 +281,6 @@ class TestResolveApiKeyProviderCredentials:
 # =============================================================================
 
 class TestRuntimeProviderResolution:
-
-    def test_runtime_zai(self, monkeypatch):
-        monkeypatch.setenv("GLM_API_KEY", "glm-key")
-        from hermes_cli.runtime_provider import resolve_runtime_provider
-        result = resolve_runtime_provider(requested="zai")
-        assert result["provider"] == "zai"
-        assert result["api_mode"] == "chat_completions"
-        assert result["api_key"] == "glm-key"
-        assert "z.ai" in result["base_url"] or "api.z.ai" in result["base_url"]
-
-
-
-    def test_runtime_minimax(self, monkeypatch):
-        monkeypatch.setenv("MINIMAX_API_KEY", "mm-key")
-        from hermes_cli.runtime_provider import resolve_runtime_provider
-        result = resolve_runtime_provider(requested="minimax")
-        assert result["provider"] == "minimax"
-        assert result["api_key"] == "mm-key"
 
     def test_runtime_ai_gateway(self, monkeypatch):
         monkeypatch.setenv("AI_GATEWAY_API_KEY", "gw-key")
@@ -449,13 +308,6 @@ class TestRuntimeProviderResolution:
         assert result["api_mode"] == "chat_completions"
         assert result["api_key"] == "gmi-key"
         assert result["base_url"] == "https://api.gmi-serving.com/v1"
-
-    def test_runtime_auto_detects_api_key_provider(self, monkeypatch):
-        monkeypatch.setenv("KIMI_API_KEY", "auto-kimi-key")
-        from hermes_cli.runtime_provider import resolve_runtime_provider
-        result = resolve_runtime_provider(requested="auto")
-        assert result["provider"] == "kimi-coding"
-        assert result["api_key"] == "auto-kimi-key"
 
     def test_runtime_copilot_uses_gh_cli_token(self, monkeypatch):
         monkeypatch.setattr("hermes_cli.copilot_auth._try_gh_cli_token", lambda: "gho_cli_secret")
@@ -671,192 +523,6 @@ class TestHasAnyProviderConfigured:
 MOONSHOT_DEFAULT_URL = "https://api.moonshot.ai/v1"
 
 
-class TestResolveKimiBaseUrl:
-    """Test _resolve_kimi_base_url() helper for key-prefix auto-detection."""
-
-    def test_sk_kimi_prefix_routes_to_kimi_code(self):
-        url = _resolve_kimi_base_url("sk-kimi-abc123", MOONSHOT_DEFAULT_URL, "")
-        assert url == KIMI_CODE_BASE_URL
-
-
-    def test_env_override_wins_over_legacy(self):
-        custom = "https://custom.example.com/v1"
-        url = _resolve_kimi_base_url("sk-abc123", MOONSHOT_DEFAULT_URL, custom)
-        assert url == custom
-
-
-class TestKimiCodeStatusAutoDetect:
-    """Test that get_api_key_provider_status auto-detects sk-kimi- keys."""
-
-
-    def test_env_override_wins(self, monkeypatch):
-        monkeypatch.setenv("KIMI_API_KEY", "sk-kimi-test-key")
-        monkeypatch.setenv("KIMI_BASE_URL", "https://override.example/v1")
-        status = get_api_key_provider_status("kimi-coding")
-        assert status["base_url"] == "https://override.example/v1"
-
-
-class TestKimiCodeCredentialAutoDetect:
-    """Test that resolve_api_key_provider_credentials auto-detects sk-kimi- keys."""
-
-
-    def test_legacy_key_gets_moonshot_url(self, monkeypatch):
-        monkeypatch.setenv("KIMI_API_KEY", "sk-legacy-secret-key")
-        creds = resolve_api_key_provider_credentials("kimi-coding")
-        assert creds["api_key"] == "sk-legacy-secret-key"
-        assert creds["base_url"] == MOONSHOT_DEFAULT_URL
-
-
-    def test_non_kimi_providers_unaffected(self, monkeypatch):
-        """Ensure the auto-detect logic doesn't leak to other providers."""
-        monkeypatch.setenv("GLM_API_KEY", "sk-kim...isnt")
-        monkeypatch.setattr("hermes_cli.auth.detect_zai_endpoint", lambda *a, **kw: None)
-        creds = resolve_api_key_provider_credentials("zai")
-        assert creds["base_url"] == "https://api.z.ai/api/paas/v4"
-
-
-class TestZaiEndpointAutoDetect:
-    """Test that resolve_api_key_provider_credentials auto-detects Z.AI endpoints."""
-
-
-    def test_env_override_skips_probe(self, monkeypatch):
-        """GLM_BASE_URL should always win without probing."""
-        monkeypatch.setenv("GLM_API_KEY", "glm-key")
-        monkeypatch.setenv("GLM_BASE_URL", "https://custom.example/v4")
-        probe_called = False
-
-        def _never_called(*a, **kw):
-            nonlocal probe_called
-            probe_called = True
-            return None
-
-        monkeypatch.setattr("hermes_cli.auth.detect_zai_endpoint", _never_called)
-        creds = resolve_api_key_provider_credentials("zai")
-        assert creds["base_url"] == "https://custom.example/v4"
-        assert not probe_called
-
-    def test_no_key_skips_probe(self, monkeypatch):
-        """Without an API key, no probe should occur."""
-        monkeypatch.setattr("hermes_cli.auth.detect_zai_endpoint", lambda *a, **kw: None)
-        creds = resolve_api_key_provider_credentials("zai")
-        assert creds["api_key"] == ""
-
-
-class TestZaiParallelProbe:
-    """detect_zai_endpoint probes endpoints in parallel workers.
-
-    Contract under test: (1) each endpoint worker preserves the per-endpoint
-    candidate-model fallback loop, (2) when several endpoints succeed the
-    winner is chosen by ZAI_ENDPOINTS priority order (not completion order).
-    """
-
-    def _mock_post(self, ok):
-        """Return an httpx.post replacement; `ok` maps (base_url, model) -> bool."""
-        import httpx as _httpx
-
-        def _post(url, headers=None, json=None, timeout=None):
-            base = url.rsplit("/chat/completions", 1)[0]
-            code = 200 if ok.get((base, json["model"])) else 401
-            request = _httpx.Request("POST", url)
-            return _httpx.Response(code, request=request, json={})
-
-        return _post
-
-    def test_candidate_model_fallback_within_endpoint(self, monkeypatch):
-        """A worker must try its endpoint's later candidate models when the
-        first ones fail — the fallback the scalar-model version dropped."""
-        from hermes_cli.auth import ZAI_ENDPOINTS, detect_zai_endpoint
-
-        coding_global = next(ep for ep in ZAI_ENDPOINTS if ep[0] == "coding-global")
-        base = coding_global[1]
-        last_model = coding_global[2][-1]
-        # Only the LAST candidate model of coding-global succeeds.
-        monkeypatch.setattr(
-            "hermes_cli.auth.httpx.post",
-            self._mock_post({(base, last_model): True}),
-        )
-        result = detect_zai_endpoint("test-key", timeout=1.0)
-        assert result is not None
-        assert result["id"] == "coding-global"
-        assert result["model"] == last_model
-
-    def test_priority_order_wins_over_completion_order(self, monkeypatch):
-        """When multiple endpoints accept the key, the FIRST in
-        ZAI_ENDPOINTS order must win, even if another finishes earlier."""
-        import time as _time
-
-        from hermes_cli.auth import ZAI_ENDPOINTS, detect_zai_endpoint
-
-        first = ZAI_ENDPOINTS[0]
-        last = ZAI_ENDPOINTS[-1]
-        ok = {
-            (first[1], first[2][0]): True,
-            (last[1], last[2][0]): True,
-        }
-        inner = self._mock_post(ok)
-
-        def _slow_first(url, headers=None, json=None, timeout=None):
-            if url.startswith(first[1]):
-                _time.sleep(0.15)  # first-priority endpoint finishes LAST
-            return inner(url, headers=headers, json=json, timeout=timeout)
-
-        monkeypatch.setattr("hermes_cli.auth.httpx.post", _slow_first)
-        result = detect_zai_endpoint("test-key", timeout=1.0)
-        assert result is not None
-        assert result["id"] == first[0]
-
-    def test_all_fail_returns_none(self, monkeypatch):
-        from hermes_cli.auth import detect_zai_endpoint
-
-        monkeypatch.setattr("hermes_cli.auth.httpx.post", self._mock_post({}))
-        assert detect_zai_endpoint("bad-key", timeout=1.0) is None
-
-    def test_early_exit_does_not_wait_for_slow_losers(self, monkeypatch):
-        """When the highest-priority endpoint succeeds fast, the caller must
-        return without waiting for slow lower-priority probes to finish."""
-        import time as _time
-
-        from hermes_cli.auth import ZAI_ENDPOINTS, detect_zai_endpoint
-
-        first = ZAI_ENDPOINTS[0]
-        inner = self._mock_post({(first[1], first[2][0]): True})
-
-        def _slow_losers(url, headers=None, json=None, timeout=None):
-            if not url.startswith(first[1]):
-                _time.sleep(2.0)  # slow lower-priority endpoints
-            return inner(url, headers=headers, json=json, timeout=timeout)
-
-        monkeypatch.setattr("hermes_cli.auth.httpx.post", _slow_losers)
-        t0 = _time.perf_counter()
-        result = detect_zai_endpoint("test-key", timeout=5.0)
-        elapsed = _time.perf_counter() - t0
-        assert result is not None and result["id"] == first[0]
-        assert elapsed < 1.5, f"early exit failed: waited {elapsed:.2f}s for losers"
-
-
-# =============================================================================
-# Kimi / Moonshot model list isolation tests
-# =============================================================================
-
-class TestKimiMoonshotModelListIsolation:
-    """Moonshot (legacy) users must not see Coding Plan-only models."""
-
-    def test_moonshot_list_excludes_coding_plan_only_models(self):
-        from hermes_cli.main import _PROVIDER_MODELS
-        moonshot_models = _PROVIDER_MODELS["moonshot"]
-        coding_plan_only = {"kimi-for-coding", "kimi-k2-thinking-turbo"}
-        leaked = set(moonshot_models) & coding_plan_only
-        assert not leaked, f"Moonshot list contains Coding Plan-only models: {leaked}"
-
-    def test_moonshot_list_non_empty(self):
-        from hermes_cli.main import _PROVIDER_MODELS
-        assert len(_PROVIDER_MODELS["moonshot"]) >= 1
-
-
-# =============================================================================
-# Hugging Face provider model list tests
-# =============================================================================
-
 class TestHuggingFaceModels:
     """Verify Hugging Face model lists are consistent across all locations."""
 
@@ -952,64 +618,8 @@ class TestNovitaProvider:
 
 
 # =============================================================================
-# MiniMax OAuth provider tests (added by feat/minimax-oauth-provider)
 # =============================================================================
 
-class TestMinimaxOAuthProvider:
-    """Tests for the minimax-oauth OAuth provider."""
-
-    def test_minimax_oauth_in_provider_registry(self):
-        assert "minimax-oauth" in PROVIDER_REGISTRY
-        pconfig = PROVIDER_REGISTRY["minimax-oauth"]
-        assert pconfig.auth_type == "oauth_minimax"
-        assert pconfig.id == "minimax-oauth"
-
-
-    def test_minimax_oauth_aux_model_registered(self):
-        # Aux model for the minimax-oauth provider now lives on the
-        # ProviderProfile (plugins/model-providers/minimax/__init__.py),
-        # not the legacy _API_KEY_PROVIDER_AUX_MODELS dict in
-        # agent/auxiliary_client.py. The profile layer is the source
-        # of truth; _get_aux_model_for_provider() reads from it first
-        # and only falls back to the dict when no profile is registered.
-        import model_tools  # noqa: F401  -- triggers plugin discovery
-        import providers
-
-        profile = providers.get_provider_profile("minimax-oauth")
-        assert profile is not None, "minimax-oauth provider profile must be registered"
-        assert profile.default_aux_model, (
-            "minimax-oauth profile must advertise a non-empty default_aux_model "
-            "so the auxiliary client (compression / vision / session-search) "
-            "doesn't fire the 'No auxiliary LLM provider configured' warning "
-            "for every minimax-oauth session."
-        )
-
-
-# =============================================================================
-# DeepInfra provider tests
-# =============================================================================
-# Registration / alias / env-var invariants are asserted in
-# TestProviderRegistry + TestResolveProvider above. The classes below
-# cover the catalog/tag/pricing/profile machinery added on top of the
-# baseline provider wiring.
-
-
-@pytest.fixture
-def _deepinfra_cache_isolation(monkeypatch):
-    """Reset the module-level catalog cache around each DeepInfra test.
-
-    The cache is keyed by base URL and would otherwise leak fixture data
-    from one test into the next in the same session. The negative cache is
-    reset too, so a test that simulates an unreachable catalog can't suppress
-    a later test's fetch within the failure TTL.
-    """
-    import hermes_cli.models as _models_mod
-    monkeypatch.setattr(_models_mod, "_deepinfra_catalog_cache", {})
-    monkeypatch.setattr(_models_mod, "_deepinfra_catalog_neg_cache", {})
-    yield
-
-
-@pytest.mark.usefixtures("_deepinfra_cache_isolation")
 class TestFetchDeepInfraModels:
     """Tests for _fetch_deepinfra_models() live model discovery."""
 
@@ -1089,6 +699,21 @@ def _make_urlopen_returning(payload):
             return _json.dumps(payload).encode()
 
     return lambda *a, **kw: _Resp()
+
+
+@pytest.fixture
+def _deepinfra_cache_isolation(monkeypatch):
+    """Reset the module-level catalog cache around each DeepInfra test.
+
+    The cache is keyed by base URL and would otherwise leak fixture data
+    from one test into the next in the same session. The negative cache is
+    reset too, so a test that simulates an unreachable catalog can't suppress
+    a later test's fetch within the failure TTL.
+    """
+    import hermes_cli.models as _models_mod
+    monkeypatch.setattr(_models_mod, "_deepinfra_catalog_cache", {})
+    monkeypatch.setattr(_models_mod, "_deepinfra_catalog_neg_cache", {})
+    yield
 
 
 @pytest.mark.usefixtures("_deepinfra_cache_isolation")
@@ -1219,44 +844,3 @@ class TestDeepInfraProviderProfile:
 
 
 
-class TestRuntimeAlibabaRegionalAndTokenPlan:
-    """#73265: the catalog-advertised Alibaba China/Token Plan variants must
-    resolve on the shared execution path (resolve_runtime_provider), not just
-    in the profile registry — provider, key, api mode, and base URL."""
-
-    def test_runtime_alibaba_cn(self, monkeypatch):
-        monkeypatch.setenv("DASHSCOPE_API_KEY", "ds-key")
-        from hermes_cli.runtime_provider import resolve_runtime_provider
-        result = resolve_runtime_provider(requested="alibaba-cn")
-        assert result["provider"] == "alibaba-cn"
-        assert result["api_mode"] == "chat_completions"
-        assert result["api_key"] == "ds-key"
-        assert result["base_url"] == "https://dashscope.aliyuncs.com/compatible-mode/v1"
-
-    def test_runtime_alibaba_coding_plan_cn(self, monkeypatch):
-        monkeypatch.setenv("ALIBABA_CODING_PLAN_API_KEY", "acp-key")
-        monkeypatch.delenv("DASHSCOPE_API_KEY", raising=False)
-        from hermes_cli.runtime_provider import resolve_runtime_provider
-        result = resolve_runtime_provider(requested="alibaba-coding-plan-cn")
-        assert result["provider"] == "alibaba-coding-plan-cn"
-        assert result["api_mode"] == "chat_completions"
-        assert result["api_key"] == "acp-key"
-        assert result["base_url"] == "https://coding.dashscope.aliyuncs.com/v1"
-
-    def test_runtime_alibaba_token_plan(self, monkeypatch):
-        monkeypatch.setenv("ALIBABA_TOKEN_PLAN_API_KEY", "atp-key")
-        from hermes_cli.runtime_provider import resolve_runtime_provider
-        result = resolve_runtime_provider(requested="alibaba-token-plan")
-        assert result["provider"] == "alibaba-token-plan"
-        assert result["api_mode"] == "chat_completions"
-        assert result["api_key"] == "atp-key"
-        assert result["base_url"] == "https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1"
-
-    def test_runtime_alibaba_token_plan_cn(self, monkeypatch):
-        monkeypatch.setenv("ALIBABA_TOKEN_PLAN_API_KEY", "atp-key")
-        from hermes_cli.runtime_provider import resolve_runtime_provider
-        result = resolve_runtime_provider(requested="alibaba-token-plan-cn")
-        assert result["provider"] == "alibaba-token-plan-cn"
-        assert result["api_mode"] == "chat_completions"
-        assert result["api_key"] == "atp-key"
-        assert result["base_url"] == "https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1"

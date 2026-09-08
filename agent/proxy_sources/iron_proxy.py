@@ -139,7 +139,6 @@ _DEFAULT_ALLOWED_HOSTS: Tuple[str, ...] = (
     "api.mistral.ai",
     "api.groq.com",
     "api.together.xyz",
-    "api.deepseek.com",
     "inference.nousresearch.com",
 )
 
@@ -150,7 +149,6 @@ _BEARER_PROVIDERS: Dict[str, Tuple[str, ...]] = {
     "OPENAI_API_KEY": ("api.openai.com",),
     "GROQ_API_KEY": ("api.groq.com",),
     "TOGETHER_API_KEY": ("api.together.xyz",),
-    "DEEPSEEK_API_KEY": ("api.deepseek.com",),
     "MISTRAL_API_KEY": ("api.mistral.ai",),
     "XAI_API_KEY": ("api.x.ai",),
     "NOUS_API_KEY": ("inference.nousresearch.com",),

@@ -479,7 +479,7 @@ def test_picker_selection_resolves_named_custom_provider_model_id(monkeypatch):
         "hermes_cli.runtime_provider.resolve_runtime_provider",
         lambda **kwargs: {
             "api_key": "test-key",
-            "base_url": "https://token.sensenova.cn/v1",
+            "base_url": "https://token.inhouse.example/v1",
             "api_mode": "chat_completions",
         },
     )
@@ -494,25 +494,25 @@ def test_picker_selection_resolves_named_custom_provider_model_id(monkeypatch):
     )
 
     result = switch_model(
-        raw_input="sensenova/deepseek-v4-flash",
+        raw_input="inhouse/model-v1",
         current_provider="openai-codex",
         current_model="gpt-5.4",
-        explicit_provider="custom:sensenova",
+        explicit_provider="custom:inhouse",
         user_providers={},
         custom_providers=[
             {
-                "name": "sensenova",
-                "base_url": "https://token.sensenova.cn/v1",
+                "name": "inhouse",
+                "base_url": "https://token.inhouse.example/v1",
                 "models": [
-                    {"id": "deepseek-v4-flash", "name": "deepseek-v4-flash"}
+                    {"id": "model-v1", "name": "model-v1"}
                 ],
             }
         ],
     )
 
     assert result.success is True
-    assert result.target_provider == "custom:sensenova"
-    assert result.new_model == "deepseek-v4-flash"
+    assert result.target_provider == "custom:inhouse"
+    assert result.new_model == "model-v1"
 
 
 
@@ -1434,7 +1434,7 @@ def test_resolve_custom_provider_passes_key_env():
         custom_providers=[
             {
                 "name": "token-plan",
-                "base_url": "https://token-plan-sgp.xiaomimimo.com/v1",
+                "base_url": "https://token-plan.inhouse.example/v1",
                 "key_env": "XIAOMI_MIMO_API_KEY",
                 "model": "mimo-v2-pro",
             }
@@ -1443,7 +1443,7 @@ def test_resolve_custom_provider_passes_key_env():
 
     assert resolved is not None
     assert resolved.api_key_env_vars == ("XIAOMI_MIMO_API_KEY",)
-    assert resolved.base_url == "https://token-plan-sgp.xiaomimimo.com/v1"
+    assert resolved.base_url == "https://token-plan.inhouse.example/v1"
 
 
 def test_discovered_models_auto_saved_to_cache(monkeypatch):

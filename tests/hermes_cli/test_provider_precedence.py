@@ -40,8 +40,8 @@ class TestProviderPrecedence:
         _clear_provider_env(monkeypatch)
         _no_aws(monkeypatch)
         _login(monkeypatch, "anthropic")           # stale OAuth login
-        _config(monkeypatch, {"provider": "zai", "default": "glm-4.6"})
-        assert resolve_provider("auto") == "zai"
+        _config(monkeypatch, {"provider": "nvidia", "default": "nemotron-3-nano"})
+        assert resolve_provider("auto") == "nvidia"
 
     def test_env_key_beats_stale_oauth(self, monkeypatch):
         """An exported provider API key wins over a logged-in OAuth active_provider."""

@@ -1,7 +1,7 @@
 """Tests for reactive multimodal-tool-content recovery.
 
 Covers the full chain for providers that reject list-type content in
-``role: "tool"`` messages (Xiaomi MiMo's 400 "text is not set", etc.):
+``role: "tool"`` messages (Meta AI's 400 "text is not set", etc.):
 
   1. agent/error_classifier.py: 400 with the right wording classifies as
      ``FailoverReason.multimodal_tool_content_unsupported``.
@@ -39,7 +39,7 @@ class _FakeApiError(Exception):
         self.response = None
 
 
-def _make_agent(provider: str = "xiaomi", model: str = "mimo-v2.5"):
+def _make_agent(provider: str = "meta-ai", model: str = "muse-spark-1.2"):
     """Build a bare AIAgent for method-level testing, no provider setup."""
     from run_agent import AIAgent
     agent = object.__new__(AIAgent)
@@ -80,7 +80,7 @@ class TestStripImagePartsHelper:
 
 
     def test_records_provider_model_in_session_cache(self):
-        agent = _make_agent(provider="xiaomi", model="mimo-v2.5")
+        agent = _make_agent(provider="meta-ai", model="muse-spark-1.2")
         msgs = [
             {"role": "tool", "tool_call_id": "x", "content": [
                 {"type": "text", "text": "summary"},
@@ -88,7 +88,7 @@ class TestStripImagePartsHelper:
             ]},
         ]
         agent._try_strip_image_parts_from_tool_messages(msgs)
-        assert ("xiaomi", "mimo-v2.5") in agent._no_list_tool_content_models
+        assert ("meta-ai", "muse-spark-1.2") in agent._no_list_tool_content_models
 
     def test_only_tool_messages_get_downgraded(self):
         """User / assistant messages with list-type content are out of
@@ -136,11 +136,11 @@ class TestToolResultContentShortCircuit:
                      "png_bytes": 1024},
         }
 
-    def test_returns_text_summary_for_xiaomi_proactively(self, monkeypatch):
-        """Xiaomi MiMo rejects list-type tool content, so even with an
+    def test_returns_text_summary_for_no_list_provider_proactively(self, monkeypatch):
+        """Meta AI rejects list-type tool content, so even with an
         empty cache, _tool_result_content_for_active_model should
         proactively downgrade to a text summary."""
-        agent = _make_agent(provider="xiaomi", model="mimo-v2.5")
+        agent = _make_agent(provider="meta-ai", model="muse-spark-1.2")
         agent._no_list_tool_content_models = set()  # explicit empty
         monkeypatch.setattr(agent, "_model_supports_vision", lambda: True)
         out = agent._tool_result_content_for_active_model(
@@ -155,15 +155,15 @@ class TestToolResultContentShortCircuit:
 
     def test_missing_cache_attribute_falls_through(self, monkeypatch):
         """Agents built via ``object.__new__`` without calling ``__init__``
-        must not crash — the cache attribute may be absent. Xiaomi still
+        must not crash — the cache attribute may be absent. Meta AI still
         gets a text summary because the provider profile says so."""
-        agent = _make_agent(provider="xiaomi", model="mimo-v2.5")
+        agent = _make_agent(provider="meta-ai", model="muse-spark-1.2")
         # Deliberately do not assign _no_list_tool_content_models.
         monkeypatch.setattr(agent, "_model_supports_vision", lambda: True)
         out = agent._tool_result_content_for_active_model(
             "computer_use", self._multimodal_result()
         )
-        # Xiaomi proactively downgrades regardless of cache state.
+        # Meta AI proactively downgrades regardless of cache state.
         assert isinstance(out, str)
         assert "data:image" not in out
 
@@ -177,7 +177,7 @@ class TestRecoveryEndToEndClassification:
     ``agent.conversation_loop`` consumes this reason directly.)
     """
 
-    def test_xiaomi_mimo_classifies(self):
+    def test_meta_ai_classifies(self):
         err = _FakeApiError(
             status_code=400,
             message=(
@@ -185,7 +185,7 @@ class TestRecoveryEndToEndClassification:
                 "'Param Incorrect', 'param': 'text is not set', 'type': ''}}"
             ),
         )
-        result = classify_api_error(err, provider="xiaomi", model="mimo-v2.5")
+        result = classify_api_error(err, provider="meta-ai", model="muse-spark-1.2")
         assert result.reason == FailoverReason.multimodal_tool_content_unsupported
         assert result.retryable is True
 

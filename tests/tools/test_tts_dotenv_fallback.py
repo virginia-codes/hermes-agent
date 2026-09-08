@@ -23,7 +23,6 @@ def isolate_env(monkeypatch):
         "ELEVENLABS_API_KEY",
         "XAI_API_KEY",
         "XAI_BASE_URL",
-        "MINIMAX_API_KEY",
         "MISTRAL_API_KEY",
         "GEMINI_API_KEY",
         "GEMINI_BASE_URL",
@@ -139,96 +138,75 @@ class TestRegressionGuard:
     def test_import_after_config_env_patch_uses_restored_dotenv_loader(self, tmp_path, monkeypatch):
         """Importing TTS while hermes_cli.config.get_env_value is patched must
         not freeze that temporary helper into this module forever.
+
+        Was written against MiniMax, whose raw-requests backend was removed
+        with the other PRC integrations. The subject is the shared key
+        resolver, so it is exercised directly here — the same code path every
+        surviving backend takes to reach ``~/.hermes/.env``.
         """
         import importlib
         import hermes_cli.config as config_mod
         from tools import tts_tool
 
-        monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+        monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
 
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(config_mod, "get_env_value", lambda name: "")
             tts_tool = importlib.reload(tts_tool)
 
         try:
-            captured: dict = {}
-
-            def fake_post(url, **kwargs):
-                captured["headers"] = kwargs.get("headers", {})
-                response = MagicMock()
-                response.json.return_value = {
-                    "data": {"audio": b"\x00".hex()},
-                    "base_resp": {"status_code": 0},
-                }
-                response.raise_for_status = MagicMock()
-                return response
-
             with patch(
                 "hermes_cli.config.load_env",
-                return_value={"MINIMAX_API_KEY": "dotenv-secret"},
-            ), patch("requests.post", side_effect=fake_post):
-                tts_tool._generate_minimax_tts(
-                    "hi", str(tmp_path / "out.mp3"), {}
+                return_value={"MISTRAL_API_KEY": "dotenv-secret"},
+            ):
+                resolved = tts_tool._resolve_provider_key(
+                    "MISTRAL_API_KEY", "mistral"
                 )
-
-            assert captured["headers"]["Authorization"] == "Bearer dotenv-secret"
+            assert resolved == "dotenv-secret"
         finally:
             importlib.reload(tts_tool)
 
-    def test_minimax_missing_when_only_in_dotenv_before_fix(self, tmp_path, monkeypatch):
+    def test_key_missing_when_only_in_dotenv_before_fix(self, tmp_path, monkeypatch):
         from tools import tts_tool
 
-        monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+        monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
 
         # Simulate ~/.hermes/.env carrying the key (load_env returns the dict
         # that get_env_value falls back to). The pre-fix ``os.getenv`` call
         # ignores this entirely and raises ValueError.
         with patch(
             "hermes_cli.config.load_env",
-            return_value={"MINIMAX_API_KEY": "dotenv-secret"},
+            return_value={"MISTRAL_API_KEY": "dotenv-secret"},
         ):
             # Sanity-check: get_env_value resolves through load_env when
             # os.environ is empty.
             from hermes_cli.config import get_env_value as live_get
-            assert live_get("MINIMAX_API_KEY") == "dotenv-secret"
+            assert live_get("MISTRAL_API_KEY") == "dotenv-secret"
 
             # And the production code path now consumes the resolved value
-            # instead of raising "MINIMAX_API_KEY not set".
-            captured: dict = {}
+            # instead of raising "MISTRAL_API_KEY not set".
+            assert (
+                tts_tool._resolve_provider_key("MISTRAL_API_KEY", "mistral")
+                == "dotenv-secret"
+            )
 
-            def fake_post(url, **kwargs):
-                captured["headers"] = kwargs.get("headers", {})
-                response = MagicMock()
-                response.json.return_value = {
-                    "data": {"audio": b"\x00".hex()},
-                    "base_resp": {"status_code": 0},
-                }
-                response.raise_for_status = MagicMock()
-                return response
-
-            with patch("requests.post", side_effect=fake_post):
-                tts_tool._generate_minimax_tts(
-                    "hi", str(tmp_path / "out.mp3"), {}
-                )
-
-            assert captured["headers"]["Authorization"] == "Bearer dotenv-secret"
-
-    def test_check_tts_requirements_sees_dotenv_minimax(self, monkeypatch):
+    def test_check_tts_requirements_sees_dotenv_key(self, monkeypatch):
         """``check_tts_requirements`` is the gate that decides whether
         ``/voice on`` is even offered. If it only checked ``os.environ`` it
-        would say "no provider available" for users who keep MINIMAX_API_KEY
+        would say "no provider available" for users who keep MISTRAL_API_KEY
         in ``~/.hermes/.env``, even though the dispatcher would later succeed.
         """
         from tools import tts_tool
 
-        monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
+        monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
 
         with patch(
             "hermes_cli.config.load_env",
-            return_value={"MINIMAX_API_KEY": "dotenv-secret"},
+            return_value={"MISTRAL_API_KEY": "dotenv-secret"},
         ), patch.object(
-            tts_tool, "_load_tts_config", return_value={"provider": "minimax"}
-        ), patch.object(tts_tool, "_import_edge_tts", side_effect=ImportError), \
+            tts_tool, "_load_tts_config", return_value={"provider": "mistral"}
+        ), patch.object(tts_tool, "_import_mistral_client", return_value=MagicMock()), \
+             patch.object(tts_tool, "_import_edge_tts", side_effect=ImportError), \
              patch.object(tts_tool, "_import_elevenlabs", side_effect=ImportError), \
              patch.object(tts_tool, "_import_openai_client", side_effect=ImportError), \
              patch.object(tts_tool, "_check_neutts_available", return_value=False), \
