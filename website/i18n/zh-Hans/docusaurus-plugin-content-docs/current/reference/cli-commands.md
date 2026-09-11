@@ -55,7 +55,6 @@ hermes [global-options] <command> [subcommand/options]
 | `hermes doctor` | 诊断配置和依赖问题。 |
 | `hermes security audit` | 对 venv、plugin 依赖和固定 MCP 服务器进行按需供应链审计（OSV.dev）。 |
 | `hermes dump` | 可直接复制粘贴的设置摘要，用于支持/调试。 |
-| `hermes debug` | 调试工具——上传日志和系统信息以获取支持。 |
 | `hermes backup` | 将 Hermes 主目录备份为 zip 文件。 |
 | `hermes checkpoints` | 检查/修剪/清除 `~/.hermes/checkpoints/`（`/rollback` 使用的影子存储）。不带参数运行可查看状态概览。 |
 | `hermes import` | 从 zip 文件恢复 Hermes 备份。 |
@@ -566,33 +565,6 @@ config_overrides:
 :::tip
 `hermes dump` 专为分享而设计。交互式诊断请使用 `hermes doctor`。可视化概览请使用 `hermes status`。
 :::
-
-## `hermes debug`
-
-```bash
-hermes debug share [options]
-```
-
-将调试报告（系统信息 + 近期日志）上传到粘贴服务并获取可分享的 URL。适用于快速支持请求——包含帮助者诊断问题所需的一切信息。
-
-| 选项 | 说明 |
-|--------|-------------|
-| `--lines <N>` | 每个日志文件包含的日志行数（默认：200）。 |
-| `--expire <days>` | 粘贴过期天数（默认：7）。 |
-| `--local` | 在本地打印报告而非上传。 |
-
-报告包含系统信息（操作系统、Python 版本、Hermes 版本）、近期 agent 和 gateway 日志（每文件 512 KB 限制）以及脱敏的 API 密钥状态。密钥始终脱敏——不会上传任何密钥。
-
-依次尝试的粘贴服务：paste.rs、dpaste.com。
-
-### 示例
-
-```bash
-hermes debug share              # 上传调试报告，打印 URL
-hermes debug share --lines 500  # 包含更多日志行
-hermes debug share --expire 30  # 粘贴保留 30 天
-hermes debug share --local      # 在终端打印报告（不上传）
-```
 
 ## `hermes backup`
 

@@ -15,8 +15,6 @@ EXPECTED_CONSOLE_COMMANDS = {
     ("logs",),
     ("version",),
     ("dump",),
-    ("debug", "share"),
-    ("debug", "delete"),
     ("prompt-size",),
     ("insights",),
     ("security", "audit"),

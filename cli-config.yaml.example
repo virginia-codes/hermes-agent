@@ -1106,7 +1106,7 @@ agent:
   # sanitiser silently repairs empty non-final turns on the wire copy; after
   # this many heal passes within a 10-minute session window Hermes logs one
   # ERROR (with session id + heal pattern) and sends a ONE-TIME out-of-band
-  # notice to the user suggesting /debug share or `hermes doctor`. The notice
+  # notice to the user suggesting `hermes doctor`. The notice
   # goes through the status channel only — conversation context and prompt
   # caching are untouched. Set 0 to disable escalation (per-window WARNINGs
   # still fire). Default 3.

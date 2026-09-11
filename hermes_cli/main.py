@@ -491,7 +491,6 @@ from hermes_cli.subcommands.verify import build_verify_parser
 from hermes_cli.subcommands.security import build_security_parser
 from hermes_cli.subcommands.approvals import build_approvals_parser
 from hermes_cli.subcommands.dump import build_dump_parser
-from hermes_cli.subcommands.debug import build_debug_parser
 from hermes_cli.subcommands.backup import build_backup_parser
 from hermes_cli.subcommands.import_cmd import build_import_cmd_parser
 from hermes_cli.subcommands.import_agent import build_import_agent_parser
@@ -5925,13 +5924,6 @@ def cmd_dump(args):
     from hermes_cli.dump import run_dump
 
     run_dump(args)
-
-
-def cmd_debug(args):
-    """Debug tools (share report, etc.)."""
-    from hermes_cli.debug import run_debug
-
-    run_debug(args)
 
 
 def cmd_config(args):
@@ -13978,11 +13970,6 @@ def main():
     # dump command  (parser built in hermes_cli/subcommands/dump.py)
     # =========================================================================
     build_dump_parser(subparsers, cmd_dump=cmd_dump)
-
-    # =========================================================================
-    # debug command  (parser built in hermes_cli/subcommands/debug.py)
-    # =========================================================================
-    build_debug_parser(subparsers, cmd_debug=cmd_debug)
 
     # =========================================================================
     # backup command  (parser built in hermes_cli/subcommands/backup.py)

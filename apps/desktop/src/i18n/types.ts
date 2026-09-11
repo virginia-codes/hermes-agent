@@ -254,27 +254,6 @@ export interface Translations {
     dismiss: string
   }
 
-  sendDiagnostics: {
-    title: string
-    privacyNotice: string
-    upload: string
-    uploading: string
-    cancel: string
-    close: string
-    copyLink: string
-    uploadIdFallback: (id: string) => string
-    doneTitle: string
-    doneDescription: string
-    failedTitle: string
-    failedHint: string
-    handoffLead: string
-    links: {
-      discord: string
-      github: string
-      portal: string
-    }
-  }
-
   titlebar: {
     hideSidebar: string
     showSidebar: string
@@ -1524,11 +1503,6 @@ export interface Translations {
       securityAuditDesc: string
       backup: string
       backupDesc: string
-      debugShare: string
-      debugShareDesc: string
-      debugShareRunning: string
-      debugShareLinks: string
-      debugShareFailed: string
       copyLink: string
       linkCopied: string
       curator: string
@@ -2937,7 +2911,6 @@ export interface Translations {
       errorOpenLogsFailed: string
       errorOpenDesktopLogs: string
       errorCopyDiagnostics: string
-      errorSendDiagnostics: string
       filesChanged: (count: number) => string
       reviewChanges: string
       readAloudFailed: string

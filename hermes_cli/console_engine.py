@@ -630,13 +630,6 @@ class HermesConsoleEngine:
                 [()],
                 set(),
             ),
-            "debug": (
-                "hermes_cli.subcommands.debug",
-                "build_debug_parser",
-                "cmd_debug",
-                [("share",), ("delete",)],
-                {("share",), ("delete",)},
-            ),
             "prompt-size": (
                 "hermes_cli.subcommands.prompt_size",
                 "build_prompt_size_parser",

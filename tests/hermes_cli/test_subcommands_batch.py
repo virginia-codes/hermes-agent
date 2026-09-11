@@ -17,7 +17,6 @@ from hermes_cli.subcommands.auth import build_auth_parser
 from hermes_cli.subcommands.backup import build_backup_parser
 from hermes_cli.subcommands.config import build_config_parser
 from hermes_cli.subcommands.dashboard import build_dashboard_parser
-from hermes_cli.subcommands.debug import build_debug_parser
 from hermes_cli.subcommands.doctor import build_doctor_parser
 from hermes_cli.subcommands.dump import build_dump_parser
 from hermes_cli.subcommands.gui import build_gui_parser
@@ -62,7 +61,6 @@ SINGLE_HANDLER_CASES = [
     ("doctor", build_doctor_parser, "cmd_doctor", ["doctor"]),
     ("security", build_security_parser, "cmd_security", ["security"]),
     ("dump", build_dump_parser, "cmd_dump", ["dump"]),
-    ("debug", build_debug_parser, "cmd_debug", ["debug"]),
     ("backup", build_backup_parser, "cmd_backup", ["backup"]),
     ("import", build_import_cmd_parser, "cmd_import", ["import", "/tmp/x.zip"]),
     ("config", build_config_parser, "cmd_config", ["config"]),

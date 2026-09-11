@@ -434,9 +434,9 @@ function Show-ProgressWindow {
 }
 
 function Show-ErrorFinale([string]$Message) {
-    # Terse by design: a title + the debug-share pointer. No error text, no
-    # log tail -- `hermes debug share` uploads the real evidence and the
-    # relaunched Desktop surfaces the result message.
+    # Terse by design: a title + the `hermes dump` pointer. No error text, no
+    # log tail -- the logs hold the real evidence and the relaunched Desktop
+    # surfaces the result message.
     if ($script:UiServer) {
         # The shim renders the error state itself; leave the window up for
         # the user to read and close. Nothing to hold for — the page keeps
@@ -451,7 +451,7 @@ function Show-ErrorFinale([string]$Message) {
         if ($ui.Timer) { $ui.Timer.Stop() }
         $ui.Bar.Visible = $false
         $ui.Title.Text = "Failed to update"
-        $ui.Sub.Text = "Run `"hermes debug share`" in a terminal to send a report."
+        $ui.Sub.Text = "Run `"hermes dump`" in a terminal for diagnostics."
         $close = New-Object System.Windows.Forms.Button
         $close.Text = "Close"
         $close.SetBounds(100, 252, 80, 28)
@@ -1007,7 +1007,7 @@ function Invoke-HermesStep([string]$Exe, [string[]]$HermesArgs, [string]$Tag) {
     # DoEvents loop keeps the marquee animating through long silent
     # stretches (pip installs) -- the old EndOfStream pump blocked on quiet
     # children and froze it. Full output still lands in the hand-off log
-    # afterwards, where `hermes debug share` picks it up.
+    # afterwards, under HERMES_HOME/logs.
     #
     # The drain is bounded once the step exits (#90455). Waiting for pipe EOF
     # is waiting on the step's whole surviving descendant tree, and this
@@ -1574,7 +1574,7 @@ try {
         $finalMsg = "Code and dependencies updated, but the Desktop app REBUILD FAILED - you are running the previous build. Run `hermes desktop --force-build` from a terminal to retry."
     } else {
         $finalCode = $res.Code
-        $finalMsg = "Update failed (exit $($res.Code)). Run `hermes debug share` in a terminal to send a report."
+        $finalMsg = "Update failed (exit $($res.Code)). Run `hermes dump` in a terminal for diagnostics."
     }
     exit $finalCode
 } finally {

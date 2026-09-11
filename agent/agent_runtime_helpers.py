@@ -4083,8 +4083,8 @@ def consume_pending_sanitizer_heal_notice() -> Optional[str]:
 def get_sanitizer_heal_stats() -> Dict[str, Dict[str, Any]]:
     """Read-only snapshot of per-session sanitiser heal counters.
 
-    Surfaced by diagnostics (``hermes doctor`` / debug share callers) so
-    repeated silent repairs are visible outside errors.log. Keys are session
+    Exposed for diagnostics so repeated silent repairs are visible outside
+    errors.log. Keys are session
     ids; values carry ``heal_events`` (sanitizer invocations that healed at
     least one message), ``messages_healed`` (total substituted turns) and
     ``escalated`` (whether the ERROR + user notice fired).
@@ -4107,8 +4107,8 @@ def _log_empty_non_final_heal(healed: int) -> None:
     transcript cannot flood ``errors.log`` (dozens of identical WARNINGs
     per hour with no user-visible signal — #96870). At the threshold the
     escalation also queues a ONE-TIME out-of-band user notice (drained by
-    ``consume_pending_sanitizer_heal_notice``) pointing at ``/debug share``
-    / ``hermes doctor`` — once per session, never re-armed by a new window.
+    ``consume_pending_sanitizer_heal_notice``) pointing at ``hermes doctor``
+    — once per session, never re-armed by a new window.
     """
     key = _session_id_for_heal_log() or "-"
     threshold = _heal_escalation_threshold()
@@ -4141,8 +4141,8 @@ def _log_empty_non_final_heal(healed: int) -> None:
                     "⚠️ Your session transcript required repeated repair "
                     f"({total_events} heal passes so far). Replies keep "
                     "working, but a corrupted turn is stuck in this "
-                    "session's history — run /debug share or `hermes "
-                    "doctor` to capture diagnostics, or /new to start a "
+                    "session's history — run `hermes doctor` to capture "
+                    "diagnostics, or /new to start a "
                     "clean session."
                 )
         elif state["escalated"]:

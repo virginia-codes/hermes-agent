@@ -9,7 +9,6 @@ import {
   getToolsetModels,
   installSkillFromHub,
   resetMemory,
-  runDebugShare,
   searchSkillsHub,
   selectToolsetModel,
   setCuratorPaused,
@@ -114,14 +113,6 @@ describe('Hermes REST parity helpers (hub / mcp / maintenance)', () => {
     expect(api).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ path: '/api/curator/paused', method: 'PUT', body: { paused: true } })
-    )
-  })
-
-  it('runs debug share synchronously with an upload-tolerant timeout', async () => {
-    await runDebugShare()
-
-    expect(api).toHaveBeenCalledWith(
-      expect.objectContaining({ path: '/api/ops/debug-share', method: 'POST', timeoutMs: 120_000 })
     )
   })
 

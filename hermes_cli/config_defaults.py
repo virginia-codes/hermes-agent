@@ -303,8 +303,8 @@ DEFAULT_CONFIG = {
         # Transcript-sanitiser repeated-heal escalation threshold (#96870).
         # After this many pre-send heal passes within a 10-minute session
         # window, log one ERROR (session id + heal pattern) and queue a
-        # ONE-TIME out-of-band user notice pointing at /debug share or
-        # `hermes doctor`. Delivered via the status channel only —
+        # ONE-TIME out-of-band user notice pointing at `hermes doctor`.
+        # Delivered via the status channel only —
         # conversation context / prompt caching untouched. 0 = disable
         # escalation (per-window WARNINGs still fire).
         "sanitizer_heal_escalation_threshold": 3,

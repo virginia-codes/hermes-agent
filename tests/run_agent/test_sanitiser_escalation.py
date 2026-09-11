@@ -154,7 +154,6 @@ class TestOneTimeUserNotice:
         notice = consume_pending_sanitizer_heal_notice()
         assert notice is not None
         assert "repeated repair" in notice
-        assert "/debug share" in notice
         assert "hermes doctor" in notice
 
         # drained: never delivered twice
@@ -234,30 +233,6 @@ class TestHealStatsSurface:
         assert stats["sess-stats"]["heal_events"] == 4
         assert stats["sess-stats"]["messages_healed"] == 4
         assert stats["sess-stats"]["escalated"] is True
-
-    def test_debug_report_includes_heal_counters(self, monkeypatch):
-        import agent.agent_runtime_helpers as arh
-        from hermes_cli.debug import collect_debug_report, LogSnapshot
-
-        monkeypatch.setattr(arh, "_heal_escalation_threshold", lambda: 2)
-        set_session_context("sess-report")
-        for _ in range(2):
-            repair_empty_non_final_messages(
-                [dict(m) for m in _poisoned_rows()]
-            )
-
-        empty = LogSnapshot(path=None, tail_text="", full_text="")
-        report = collect_debug_report(
-            log_lines=5,
-            dump_text="dump",
-            log_snapshots={
-                k: empty
-                for k in ("agent", "errors", "gateway", "gui", "desktop")
-            },
-        )
-        assert "transcript sanitiser heal counters" in report
-        assert "sess-report: 2 heal events" in report
-        assert "escalated=True" in report
 
 
 class TestProjectionStopsReheal:
@@ -367,7 +342,7 @@ class TestProjectionStopsReheal:
             _arh._empty_heal_user_notified.add(_live_key)
             _arh._empty_heal_pending_notice[_live_key] = (
                 "⚠️ Your session transcript required repeated repair — "
-                "run /debug share or `hermes doctor`."
+                "run `hermes doctor`."
             )
 
         warned = []
