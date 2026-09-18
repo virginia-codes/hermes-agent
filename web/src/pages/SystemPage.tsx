@@ -3,7 +3,6 @@ import { Link } from "react-router";
 import {
   Activity,
   Brain,
-  Check,
   Cpu,
   Database,
   Download,
